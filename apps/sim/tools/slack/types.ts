@@ -749,7 +749,6 @@ export interface SlackListChannelsParams extends SlackBaseParams {
   excludeArchived?: boolean
   limit?: number
   cursor?: string
-  maxPages?: number
 }
 
 export interface SlackListMembersParams extends SlackBaseParams {
@@ -1164,7 +1163,6 @@ export interface SlackListChannelsResponse extends ToolResponse {
     count: number
     hasMore: boolean
     nextCursor: string | null
-    pages: number
   }
 }
 
