@@ -1250,6 +1250,7 @@ export type CreateCredentialConnectionBody =
       workspaceId: string
       displayName: string
       providerId:
+        | 'github-repositories'
         | 'google-email'
         | 'google-drive'
         | 'google-docs'
@@ -4431,7 +4432,7 @@ export type GetMetaQuery = Record<string, unknown>
 
 type GetMetaResponseRef0 = {
   v2Enabled: boolean
-  keyType: 'personal' | 'workspace'
+  keyType: 'personal' | 'workspace' | 'oauth_access_token'
   expiresAt: string | null
 }
 
@@ -8287,6 +8288,7 @@ export type UpdateCredentialBody = {
   serviceAccountJson?: string
   apiToken?: string
   domain?: string
+  atlassianProduct?: 'jira' | 'confluence'
   signingSecret?: string
   botToken?: string
   clientId?: string
@@ -9497,7 +9499,7 @@ export type UpsertTableRowResponse = {
  * `summary` is the operation's one-line description, lifted from the OpenAPI
  * specs so `--help` reuses prose that is already written and already checked.
  *
- * `personalKeyOnly` marks an operation whose spec description says a workspace
+ * `workspaceKeyUnsupported` marks an operation whose spec says a workspace
  * API key is rejected, so `--help` can say so before the request is sent.
  */
 export const V2_OPERATIONS = {
@@ -9558,7 +9560,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Activate Workflow Version',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
   },
   addTableColumn: {
     method: 'POST',
@@ -9605,7 +9607,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { knowledgeBaseId: 'Unique knowledge base identifier.' },
     responseMode: 'json',
     summary: 'Index Workspace Files',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -9627,7 +9629,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { workflowId: 'Unique workflow identifier.' },
     responseMode: 'json',
     summary: 'Apply Workflow Operations',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       dryRun: {
         kind: 'boolean',
@@ -9722,7 +9724,7 @@ export const V2_OPERATIONS = {
       folderPaths: {
         kind: 'string',
         describe:
-          'Folder paths to include with all their descendants, comma-separated. At most 100 entries, and the files they resolve to count against the same 100-file download ceiling. A path that matches no folder is rejected rather than ignored.',
+          'Comma-separated folder paths whose contents are included recursively. Up to 100 paths; resolved files share the 100-file download limit. Unknown paths are rejected.',
       },
     },
   },
@@ -9733,7 +9735,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { knowledgeBaseId: 'Unique knowledge base identifier.' },
     responseMode: 'json',
     summary: 'Bulk Save Tag Definitions',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -9757,7 +9759,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Bulk Update Chunks',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -9785,7 +9787,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { knowledgeBaseId: 'Unique knowledge base identifier.' },
     responseMode: 'json',
     summary: 'Bulk Enable or Disable Documents',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -9903,7 +9905,7 @@ export const V2_OPERATIONS = {
       filter: {
         kind: 'unknown',
         describe:
-          'Recursive predicate tree. Each group node is exactly one non-empty `all` or `any` array whose members are further groups or `{ field, op, value }` conditions; the root must be a group, not a bare condition. At most 100 members per group, 10 levels of nesting, and 500 nodes in total. The negating operators include nulls: `ne`, `nin`, `ncontains`, `nlike`, and `nilike` match rows whose column is null or absent, so "not X" is not the complement of "X" over a nullable column. That holds for every column type, multi-select included. To exclude nulls, `all`-combine the negation with `isNotEmpty` (multi-select) or `isNotNull`. Comparison: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`. Membership: `in`, `nin` (array operand). Emptiness: `isEmpty`, `isNotEmpty`, `isNull`, `isNotNull` (no operand). Substring, always case-insensitive, operand matched literally: `contains`, `ncontains`, `startsWith`, `endsWith`. Pattern: `like`/`nlike` (case-sensitive), `ilike`/`nilike` (case-insensitive). **`*` is the only wildcard** and stands for any run of characters; `%`, `_`, and backslash match themselves. Use `like: "Hi*"`, not `like: "Hi%"`. A `select` column compares by option id and restricts its operators: single-select accepts `eq`, `ne`, `in`, `nin`; multi-select accepts `contains`, `ncontains`. Option names are accepted as operands and resolved to ids.',
+          'Recursive non-empty `all`/`any` groups containing groups or conditions; the root cannot be a condition. Limits: 100 members per group, 10 levels, and 500 nodes. The negating operators include nulls and absent cells, multi-select included; combine with `isNotNull` or `isNotEmpty` to exclude them. Pattern operators use `*` as the only wildcard; `%`, `_`, and backslash are literal. Select operators: single-select uses `eq`/`ne`/`in`/`nin`; multi-select uses `contains`/`ncontains`; option names resolve to IDs. Full operand rules are documented on `op`.',
       },
       excludeRowIds: { kind: 'array', describe: 'Rows excluded from an all-scope cancellation.' },
     },
@@ -10012,7 +10014,7 @@ export const V2_OPERATIONS = {
     pathParams: [] as const,
     responseMode: 'json',
     summary: 'Create Credential Connection',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     opaqueBody: true,
   },
   createCustomTool: {
@@ -10183,7 +10185,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Create Chunk',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -10209,7 +10211,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { knowledgeBaseId: 'Unique knowledge base identifier.' },
     responseMode: 'json',
     summary: 'Create Knowledge Connector',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -10325,7 +10327,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { knowledgeBaseId: 'Unique knowledge base identifier.' },
     responseMode: 'json',
     summary: 'Create Tag',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -10388,8 +10390,7 @@ export const V2_OPERATIONS = {
         kind: 'enum',
         values: ['streamable-http'] as const,
         default: 'streamable-http',
-        describe:
-          'Transport used to communicate with the server. Applied server-side as `streamable-http` when omitted on create.',
+        describe: 'Transport protocol. Defaults to `streamable-http` on creation.',
       },
       url: {
         kind: 'string',
@@ -10411,19 +10412,17 @@ export const V2_OPERATIONS = {
       timeout: {
         kind: 'integer',
         default: 30000,
-        describe:
-          'Per-request timeout in milliseconds. Applied server-side as 30000 when omitted on create.',
+        describe: 'Per-request timeout in milliseconds. Defaults to 30000 on creation.',
       },
       retries: {
         kind: 'integer',
         default: 3,
-        describe: 'Number of retries per request. Applied server-side as 3 when omitted on create.',
+        describe: 'Number of retries per request. Defaults to 3 on creation.',
       },
       enabled: {
         kind: 'boolean',
         default: true,
-        describe:
-          'Whether the server tools are available to workflows. Applied server-side as true when omitted on create.',
+        describe: "Whether workflows can use the server's tools. Defaults to true on creation.",
       },
       oauthClientId: {
         kind: 'string',
@@ -10443,7 +10442,7 @@ export const V2_OPERATIONS = {
     pathParams: [] as const,
     responseMode: 'json',
     summary: 'Create Sandbox',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -10484,7 +10483,7 @@ export const V2_OPERATIONS = {
     pathParams: [] as const,
     responseMode: 'json',
     summary: 'Create Service-Account Credential',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -10524,7 +10523,7 @@ export const V2_OPERATIONS = {
     pathParams: [] as const,
     responseMode: 'json',
     summary: 'Create Skill',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -10587,7 +10586,7 @@ export const V2_OPERATIONS = {
       filter: {
         kind: 'unknown',
         describe:
-          'Recursive predicate tree. Each group node is exactly one non-empty `all` or `any` array whose members are further groups or `{ field, op, value }` conditions; the root must be a group, not a bare condition. At most 100 members per group, 10 levels of nesting, and 500 nodes in total. The negating operators include nulls: `ne`, `nin`, `ncontains`, `nlike`, and `nilike` match rows whose column is null or absent, so "not X" is not the complement of "X" over a nullable column. That holds for every column type, multi-select included. To exclude nulls, `all`-combine the negation with `isNotEmpty` (multi-select) or `isNotNull`. Comparison: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`. Membership: `in`, `nin` (array operand). Emptiness: `isEmpty`, `isNotEmpty`, `isNull`, `isNotNull` (no operand). Substring, always case-insensitive, operand matched literally: `contains`, `ncontains`, `startsWith`, `endsWith`. Pattern: `like`/`nlike` (case-sensitive), `ilike`/`nilike` (case-insensitive). **`*` is the only wildcard** and stands for any run of characters; `%`, `_`, and backslash match themselves. Use `like: "Hi*"`, not `like: "Hi%"`. A `select` column compares by option id and restricts its operators: single-select accepts `eq`, `ne`, `in`, `nin`; multi-select accepts `contains`, `ncontains`. Option names are accepted as operands and resolved to ids.',
+          'Recursive non-empty `all`/`any` groups containing groups or conditions; the root cannot be a condition. Limits: 100 members per group, 10 levels, and 500 nodes. The negating operators include nulls and absent cells, multi-select included; combine with `isNotNull` or `isNotEmpty` to exclude them. Pattern operators use `*` as the only wildcard; `%`, `_`, and backslash are literal. Select operators: single-select uses `eq`/`ne`/`in`/`nin`; multi-select uses `contains`/`ncontains`; option names resolve to IDs. Full operand rules are documented on `op`.',
       },
       excludeRowIds: { kind: 'array', describe: 'Rows excluded from a select-all run scope.' },
       limit: { kind: 'object', describe: 'Optional cap on eligible rows to run.' },
@@ -10743,7 +10742,7 @@ export const V2_OPERATIONS = {
     pathParams: [] as const,
     responseMode: 'json',
     summary: 'Create Workflow MCP Server',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -10775,7 +10774,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { credentialId: 'Credential to disconnect.' },
     responseMode: 'json',
     summary: 'Disconnect Credential',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -10867,7 +10866,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Delete Chunk',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -10886,7 +10885,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Delete Knowledge Connector',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -10958,7 +10957,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Delete Tag',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -10974,7 +10973,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { knowledgeBaseId: 'Unique knowledge base identifier.' },
     responseMode: 'json',
     summary: 'Delete Tag Definitions',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -11010,7 +11009,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { sandboxId: 'Unique sandbox identifier.' },
     responseMode: 'json',
     summary: 'Delete Sandbox',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: { kind: 'string', required: true, describe: 'Workspace that owns the sandbox.' },
     },
@@ -11022,7 +11021,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { name: 'Secret to delete.' },
     responseMode: 'json',
     summary: 'Delete Secret',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -11049,7 +11048,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Delete Skill',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: { kind: 'string', required: true, describe: 'Workspace that owns the skill.' },
     },
@@ -11131,7 +11130,7 @@ export const V2_OPERATIONS = {
       filter: {
         kind: 'unknown',
         describe:
-          'Recursive predicate tree. Each group node is exactly one non-empty `all` or `any` array whose members are further groups or `{ field, op, value }` conditions; the root must be a group, not a bare condition. At most 100 members per group, 10 levels of nesting, and 500 nodes in total. The negating operators include nulls: `ne`, `nin`, `ncontains`, `nlike`, and `nilike` match rows whose column is null or absent, so "not X" is not the complement of "X" over a nullable column. That holds for every column type, multi-select included. To exclude nulls, `all`-combine the negation with `isNotEmpty` (multi-select) or `isNotNull`. Comparison: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`. Membership: `in`, `nin` (array operand). Emptiness: `isEmpty`, `isNotEmpty`, `isNull`, `isNotNull` (no operand). Substring, always case-insensitive, operand matched literally: `contains`, `ncontains`, `startsWith`, `endsWith`. Pattern: `like`/`nlike` (case-sensitive), `ilike`/`nilike` (case-insensitive). **`*` is the only wildcard** and stands for any run of characters; `%`, `_`, and backslash match themselves. Use `like: "Hi*"`, not `like: "Hi%"`. A `select` column compares by option id and restricts its operators: single-select accepts `eq`, `ne`, `in`, `nin`; multi-select accepts `contains`, `ncontains`. Option names are accepted as operands and resolved to ids.',
+          'Recursive non-empty `all`/`any` groups containing groups or conditions; the root cannot be a condition. Limits: 100 members per group, 10 levels, and 500 nodes. The negating operators include nulls and absent cells, multi-select included; combine with `isNotNull` or `isNotEmpty` to exclude them. Pattern operators use `*` as the only wildcard; `%`, `_`, and backslash are literal. Select operators: single-select uses `eq`/`ne`/`in`/`nin`; multi-select uses `contains`/`ncontains`; option names resolve to IDs. Full operand rules are documented on `op`.',
       },
       limit: { kind: 'integer', describe: 'Maximum matching rows to delete.' },
       rowIds: { kind: 'array', describe: 'Explicit row identifiers to delete.' },
@@ -11163,7 +11162,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { workflowId: 'Unique workflow identifier.' },
     responseMode: 'json',
     summary: 'Delete Workflow Chat Deployment',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
   },
   deleteWorkflowFolder: {
     method: 'DELETE',
@@ -11215,7 +11214,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { serverId: 'Unique workflow-MCP server identifier.' },
     responseMode: 'json',
     summary: 'Delete Workflow MCP Server',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
   },
   deployWorkflow: {
     method: 'POST',
@@ -11224,7 +11223,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { workflowId: 'Unique workflow identifier.' },
     responseMode: 'json',
     summary: 'Deploy Workflow',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       name: { kind: 'string', describe: 'Optional label for the deployment version.' },
       description: {
@@ -11240,7 +11239,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { serverId: 'Unique workflow-MCP server identifier.' },
     responseMode: 'json',
     summary: 'Publish Workflow As MCP Tool',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workflowId: {
         kind: 'string',
@@ -11331,7 +11330,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Run Tool',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -11343,7 +11342,7 @@ export const V2_OPERATIONS = {
         kind: 'object',
         default: {},
         describe:
-          'Arguments for the tool, keyed by the parameter ids the tool catalog publishes for it. A parameter whose visibility is `user-only` also accepts an environment-variable reference written as the whole value, `{{VAR_NAME}}`, resolved server-side against the workspace environment; any other value is sent verbatim.',
+          'Tool arguments keyed by published parameter IDs. For `user-only` parameters, a whole-value `{{VAR_NAME}}` reference resolves a workspace environment variable. Other values pass through unchanged.',
       },
       credentialId: {
         kind: 'string',
@@ -11371,18 +11370,18 @@ export const V2_OPERATIONS = {
       run: {
         kind: 'unknown',
         describe:
-          'Workflow state and entry point to execute. Omit for the active deployment. Manual execution requires a personal API key with write access and supports synchronous or streamed runs only.',
+          'Workflow state and entry point to execute. Omit for the active deployment. Manual execution requires OAuth or personal-key write access and supports synchronous or streamed runs only.',
       },
       async: {
         kind: 'boolean',
         default: false,
         describe:
-          'Queue the run and return a 202 receipt when true. Requires an API key, cannot be combined with `stream`, and rejects all streaming and output-shaping options (`selectedOutputs`, `includeThinking`, `includeToolCalls`, `includeFileBase64`, `base64MaxBytes`).',
+          'Queue the run and return a 202 receipt when true. Requires an OAuth access token or API key, cannot be combined with `stream`, and rejects all streaming and output-shaping options (`selectedOutputs`, `includeThinking`, `includeToolCalls`, `includeFileBase64`, `base64MaxBytes`).',
       },
       executionTimeoutSeconds: {
         kind: 'integer',
         describe:
-          "Requested server-side timeout for an asynchronous run, in seconds. An upper bound, not the effective timeout: the run uses the smaller of this value and the plan's execution timeout, so requesting more than the plan allows silently yields the plan timeout. Rejected with `400` unless `async` is true.",
+          "Maximum duration of an asynchronous run, in seconds, capped by the plan's execution timeout. Requires `async: true`; otherwise returns `400`.",
       },
       stream: {
         kind: 'boolean',
@@ -11393,7 +11392,7 @@ export const V2_OPERATIONS = {
       selectedOutputs: {
         kind: 'array',
         describe:
-          'Block output references to include in a streamed response. Use `<blockName>.<outputPath>` for the executed workflow or `<childWorkflowId>.<blockName>.<outputPath>` for a child workflow; block names are normalized workflow reference names. Selecting a child workflow applies to every invocation of it. Requires `stream: true` — it shapes the streamed envelope only, so it is rejected on a sync request and when `async` is true. To narrow a finished run, pass `selectedOutputs` to the run resource instead.',
+          'Output references for streaming: `<blockName>.<outputPath>` or `<childWorkflowId>.<blockName>.<outputPath>`, using normalized block names. Child references apply to every invocation. Requires `stream: true` and rejects synchronous or async requests. Use `selectedOutputs` with Get Workflow Run to narrow an existing run.',
       },
       includeThinking: {
         kind: 'boolean',
@@ -11421,7 +11420,7 @@ export const V2_OPERATIONS = {
       'x-run-id': {
         kind: 'string',
         describe:
-          'Caller-supplied run identifier, available only to API-key callers. A one-shot uniqueness claim, NOT an idempotency key: reusing a value fails with `409` and `error.details.code: "RUN_ID_CONFLICT"` rather than replaying the original result. To retry safely, send a fresh value per attempt, or omit the header and let the server allocate one.',
+          'Run ID for API-key or OAuth callers; ignored for anonymous requests. Reuse it after an uncertain response: a claimed ID returns `409` with `RUN_ID_CONFLICT`, without replaying results. Check Get Workflow Run, but `404` can persist while the ID remains claimed and does not establish whether execution started. Do not automatically restart with a fresh or omitted ID; either can start another run.',
       },
       'x-sim-via': {
         kind: 'string',
@@ -11445,7 +11444,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { auditLogId: 'Audit-log entry identifier.' },
     responseMode: 'json',
     summary: 'Get Audit Log',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       organizationId: {
         kind: 'string',
@@ -11579,7 +11578,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Get Chunk',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -11598,7 +11597,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Get Knowledge Connector',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -11653,7 +11652,7 @@ export const V2_OPERATIONS = {
       folderPaths: {
         kind: 'string',
         describe:
-          'Comma-separated workflow folder paths to include. At most 100 entries. A path covers its whole subtree. A path that names no folder narrows the result to nothing, so the response is an empty page rather than an error.',
+          'Comma-separated workflow folder paths, including descendants. Up to 100 paths. Unknown folder paths contribute no matches.',
       },
       triggers: {
         kind: 'string',
@@ -11679,7 +11678,7 @@ export const V2_OPERATIONS = {
         kind: 'integer',
         default: 72,
         describe:
-          'Number of equal time buckets to divide the window into, from 1 to 500. Exactly this many buckets are always returned. Buckets are never narrower than one minute, so on a short window the series extends past the end of the window rather than being compressed, and the trailing buckets are empty.',
+          'Number of time buckets, up to 500. Exactly this many are returned, each at least one minute wide. Short windows extend past the requested end and include empty trailing buckets.',
       },
     },
   },
@@ -11712,7 +11711,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { knowledgeBaseId: 'Unique knowledge base identifier.' },
     responseMode: 'json',
     summary: 'Get Next Tag Slot',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -11896,7 +11895,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { workflowId: 'Unique workflow identifier.' },
     responseMode: 'json',
     summary: 'Get Workflow Chat Deployment',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
   },
   getWorkflowDeployment: {
     method: 'GET',
@@ -11913,7 +11912,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { serverId: 'Unique workflow-MCP server identifier.' },
     responseMode: 'json',
     summary: 'Get Workflow MCP Server',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
   },
   getWorkflowRun: {
     method: 'GET',
@@ -11984,7 +11983,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Grant Skill Editor',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: { kind: 'string', required: true, describe: 'Workspace that owns the skill.' },
       email: {
@@ -12026,7 +12025,7 @@ export const V2_OPERATIONS = {
     pathParams: [] as const,
     responseMode: 'json',
     summary: 'List Audit Logs',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       action: { kind: 'string', describe: 'Filter by exact action name.' },
       resourceType: {
@@ -12095,7 +12094,7 @@ export const V2_OPERATIONS = {
       workspaceId: {
         kind: 'string',
         describe:
-          "Narrow the ledger to usage events attributed to one workspace. It does not change whose events are reported — a personal API key always reports the usage of the person holding it, and a workspace API key always reports its own workspace's complete ledger across every member. The response `scope` field says which of the two you received. A workspace API key is pinned to its own workspace: any other id answers `404 Workspace not found`, which is also what an id that does not exist answers.",
+          "Narrow the ledger to one workspace. An OAuth token or personal API key reports only its user's events; a workspace API key reports every member's events in its bound workspace. The response `scope` identifies which view was returned. A workspace key asking for another workspace receives the same `404 Workspace not found` as an unknown id.",
       },
       period: {
         kind: 'enum',
@@ -12158,7 +12157,7 @@ export const V2_OPERATIONS = {
       source: {
         kind: 'enum',
         values: ['builtin', 'custom'] as const,
-        describe: 'Restrict to shipped blocks or to this workspace’s deployed custom blocks.',
+        describe: "Restrict to built-in blocks or this workspace's deployed custom blocks.",
       },
       sortBy: {
         kind: 'enum',
@@ -12369,7 +12368,7 @@ export const V2_OPERATIONS = {
       parentPath: {
         kind: 'string',
         describe:
-          'Restrict results to direct children of this parent path. A path that names no folder narrows the result to nothing, so the response is an empty page rather than an error.',
+          'Restrict results to direct children of this parent path. Unknown folder paths contribute no matches.',
       },
       search: {
         kind: 'string',
@@ -12434,7 +12433,7 @@ export const V2_OPERATIONS = {
       folderPath: {
         kind: 'string',
         describe:
-          'Restrict results to files inside this folder — its direct children, or its whole subtree when `recursive` is true. A path that names no folder narrows the result to nothing, so the response is an empty page rather than an error.',
+          'Restrict files to this folder, including subfolders when `recursive` is true. Unknown folder paths contribute no matches.',
       },
       recursive: {
         kind: 'enum',
@@ -12453,7 +12452,7 @@ export const V2_OPERATIONS = {
           'disabled',
         ] as const,
         describe:
-          'Whether the folder filter includes files in subfolders. Defaults to true when a search is set, false otherwise, so listing a folder shows that folder while searching one looks through everything in it. Ignored when no folder filter is set, which already spans the workspace. The listed spellings are the whole accepted vocabulary and are case-sensitive; any other value is rejected.',
+          'Include subfolders in the folder filter. Defaults to true when searching and false otherwise. Ignored without a folder filter.',
       },
       scope: {
         kind: 'enum',
@@ -12509,12 +12508,12 @@ export const V2_OPERATIONS = {
         values: ['active', 'archived'] as const,
         default: 'active',
         describe:
-          'Which lifecycle set to list: `active` (default) for live knowledge bases, `archived` for knowledge bases a `DELETE` archived and `POST /knowledge/{knowledgeBaseId}/restore` can bring back. `folderPath` resolves against active folders only, so pairing it with `scope=archived` returns an empty page when the containing folder was archived too.',
+          'Lifecycle scope: active or archived knowledge bases. Use Restore Knowledge Base to recover archived entries. Folder paths resolve only active folders, so filtering by an archived folder returns no matches.',
       },
       folderPath: {
         kind: 'string',
         describe:
-          'Restrict results to knowledge bases in this folder. A path that names no folder narrows the result to nothing, so the response is an empty page rather than an error.',
+          'Restrict results to knowledge bases in this folder. Unknown folder paths contribute no matches.',
       },
       search: {
         kind: 'string',
@@ -12556,7 +12555,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'List Chunks',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -12608,7 +12607,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'List Knowledge Connector Documents',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -12639,7 +12638,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { knowledgeBaseId: 'Unique knowledge base identifier.' },
     responseMode: 'json',
     summary: 'List Knowledge Connectors',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -12748,7 +12747,7 @@ export const V2_OPERATIONS = {
       parentPath: {
         kind: 'string',
         describe:
-          'Restrict results to direct children of this parent path. A path that names no folder narrows the result to nothing, so the response is an empty page rather than an error.',
+          'Restrict results to direct children of this parent path. Unknown folder paths contribute no matches.',
       },
       search: {
         kind: 'string',
@@ -12791,7 +12790,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { knowledgeBaseId: 'Unique knowledge base identifier.' },
     responseMode: 'json',
     summary: 'List Tag Usage',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -12820,7 +12819,7 @@ export const V2_OPERATIONS = {
       triggers: {
         kind: 'string',
         describe:
-          'Comma-separated trigger types to include. An empty entry is rejected. Values are matched exactly and are case-sensitive — every recorded trigger is lowercase, so `API` matches nothing while `api` matches. The vocabulary is open: it covers the core trigger types (`manual`, `api`, `schedule`, `chat`, `webhook`, `mcp`, `copilot`, `workflow`, `custom_block`) and the provider id of any webhook trigger (`slack`, `gmail`, `github`, …), so an unrecognized member is not rejected — it selects no runs. The literal value `all` is a sentinel that disables this filter entirely, so a list containing it returns runs of every trigger type; no real trigger type is named `all`. At most 100 entries.',
+          'Comma-separated, lowercase trigger types or webhook provider IDs. Matching is exact and case-sensitive; unknown values select no runs. An empty entry is rejected. The sentinel `all` disables this filter, even when listed with other values. At most 100 entries.',
       },
       level: {
         kind: 'enum',
@@ -12899,7 +12898,7 @@ export const V2_OPERATIONS = {
       includeJobRuns: {
         kind: 'boolean',
         describe:
-          'Whether Chat and Sim-agent job runs join the sequence alongside workflow runs. Job runs report `kind: "job"`, carry no `workflow` summary, and never carry a cost ledger. They are dropped entirely — not partially matched — whenever a filter they cannot answer is set: by workflow, workflow name, folder, model, or status. A filter therefore never means two different things across the union. Accepted only when sorting by `startedAt`: job runs record cost as a document and no comparable status, so they cannot participate in the other orderings.',
+          'Include Chat and Sim-agent jobs alongside workflow runs. Jobs use `kind: "job"` and have no workflow or cost ledger. Workflow, folder, model, or status filters exclude jobs. This option is valid only when sorting by `startedAt`.',
       },
       runId: { kind: 'string', describe: 'Exact run identifier to match.' },
       sortBy: {
@@ -12918,7 +12917,7 @@ export const V2_OPERATIONS = {
       folderPaths: {
         kind: 'string',
         describe:
-          'Comma-separated workflow folder paths to include. At most 100 entries. A path covers its whole subtree, so `/prod` also selects runs in `/prod/nested`. A path that names no folder narrows the result to nothing, so the response is an empty page rather than an error.',
+          'Comma-separated workflow folder paths, including descendants. Up to 100 paths. Unknown folder paths contribute no matches.',
       },
     },
   },
@@ -12971,7 +12970,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { mcpServerId: 'Unique MCP server identifier.' },
     responseMode: 'json',
     summary: 'List MCP Server Tools',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -12981,7 +12980,7 @@ export const V2_OPERATIONS = {
       refresh: {
         kind: 'boolean',
         describe:
-          'Bypass the short-lived per-workspace tool cache and reconnect under your own credentials. A cached result reflects whichever workspace member last ran discovery, so this is the only way to pick up a tool added since then; it costs a live round trip.',
+          "Refresh tools using your credentials. Otherwise results may reuse another workspace member's recent discovery and omit newly added tools.",
       },
     },
   },
@@ -13029,7 +13028,7 @@ export const V2_OPERATIONS = {
     pathParams: [] as const,
     responseMode: 'json',
     summary: 'List Secrets',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -13173,7 +13172,7 @@ export const V2_OPERATIONS = {
       parentPath: {
         kind: 'string',
         describe:
-          'Restrict results to direct children of this parent path. A path that names no folder narrows the result to nothing, so the response is an empty page rather than an error.',
+          'Restrict results to direct children of this parent path. Unknown folder paths contribute no matches.',
       },
       search: {
         kind: 'string',
@@ -13243,7 +13242,7 @@ export const V2_OPERATIONS = {
       folderPath: {
         kind: 'string',
         describe:
-          'Restrict results to tables in this folder. A path that names no folder narrows the result to nothing, so the response is an empty page rather than an error.',
+          'Restrict results to tables in this folder. Unknown folder paths contribute no matches.',
       },
       search: {
         kind: 'string',
@@ -13353,7 +13352,7 @@ export const V2_OPERATIONS = {
       parentPath: {
         kind: 'string',
         describe:
-          'Restrict results to direct children of this parent path. A path that names no folder narrows the result to nothing, so the response is an empty page rather than an error.',
+          'Restrict results to direct children of this parent path. Unknown folder paths contribute no matches.',
       },
       search: {
         kind: 'string',
@@ -13391,7 +13390,7 @@ export const V2_OPERATIONS = {
     pathParams: [] as const,
     responseMode: 'json',
     summary: 'List Workflow MCP Servers',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -13431,7 +13430,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { serverId: 'Unique workflow-MCP server identifier.' },
     responseMode: 'json',
     summary: 'List Workflow MCP Tools',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
   },
   listWorkflowRuns: {
     method: 'GET',
@@ -13499,7 +13498,7 @@ export const V2_OPERATIONS = {
       folderPath: {
         kind: 'string',
         describe:
-          'Restrict results to workflows in this folder path. A path that names no folder narrows the result to nothing, so the response is an empty page rather than an error.',
+          'Restrict results to workflows in this folder path. Unknown folder paths contribute no matches.',
       },
       deployedOnly: {
         kind: 'boolean',
@@ -13681,7 +13680,7 @@ export const V2_OPERATIONS = {
       predicate: {
         kind: 'unknown',
         describe:
-          'A single `{ field, op, value }` condition or a recursive `all`/`any` group; either form is normalized to a grouped predicate after validation. At most 100 members per group, 10 levels of nesting, and 500 nodes in total. The negating operators include nulls: `ne`, `nin`, `ncontains`, `nlike`, and `nilike` match rows whose column is null or absent, so "not X" is not the complement of "X" over a nullable column. That holds for every column type, multi-select included. To exclude nulls, `all`-combine the negation with `isNotEmpty` (multi-select) or `isNotNull`. Comparison: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`. Membership: `in`, `nin` (array operand). Emptiness: `isEmpty`, `isNotEmpty`, `isNull`, `isNotNull` (no operand). Substring, always case-insensitive, operand matched literally: `contains`, `ncontains`, `startsWith`, `endsWith`. Pattern: `like`/`nlike` (case-sensitive), `ilike`/`nilike` (case-insensitive). **`*` is the only wildcard** and stands for any run of characters; `%`, `_`, and backslash match themselves. Use `like: "Hi*"`, not `like: "Hi%"`. A `select` column compares by option id and restricts its operators: single-select accepts `eq`, `ne`, `in`, `nin`; multi-select accepts `contains`, `ncontains`. Option names are accepted as operands and resolved to ids.',
+          'One condition or a recursive `all`/`any` group, normalized to a grouped predicate. Limits: 100 members per group, 10 levels, and 500 nodes. The negating operators include nulls and absent cells, multi-select included; combine with `isNotNull` or `isNotEmpty` to exclude them. Pattern operators use `*` as the only wildcard; `%`, `_`, and backslash are literal. Select operators: single-select uses `eq`/`ne`/`in`/`nin`; multi-select uses `contains`/`ncontains`; option names resolve to IDs. Full operand rules are documented on `op`.',
       },
       sort: { kind: 'array', describe: 'Ordered table-row sort specification.' },
       limit: {
@@ -13709,7 +13708,7 @@ export const V2_OPERATIONS = {
       predicate: {
         kind: 'unknown',
         describe:
-          'A single `{ field, op, value }` condition or a recursive `all`/`any` group; either form is normalized to a grouped predicate after validation. At most 100 members per group, 10 levels of nesting, and 500 nodes in total. The negating operators include nulls: `ne`, `nin`, `ncontains`, `nlike`, and `nilike` match rows whose column is null or absent, so "not X" is not the complement of "X" over a nullable column. That holds for every column type, multi-select included. To exclude nulls, `all`-combine the negation with `isNotEmpty` (multi-select) or `isNotNull`. Comparison: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`. Membership: `in`, `nin` (array operand). Emptiness: `isEmpty`, `isNotEmpty`, `isNull`, `isNotNull` (no operand). Substring, always case-insensitive, operand matched literally: `contains`, `ncontains`, `startsWith`, `endsWith`. Pattern: `like`/`nlike` (case-sensitive), `ilike`/`nilike` (case-insensitive). **`*` is the only wildcard** and stands for any run of characters; `%`, `_`, and backslash match themselves. Use `like: "Hi*"`, not `like: "Hi%"`. A `select` column compares by option id and restricts its operators: single-select accepts `eq`, `ne`, `in`, `nin`; multi-select accepts `contains`, `ncontains`. Option names are accepted as operands and resolved to ids.',
+          'One condition or a recursive `all`/`any` group, normalized to a grouped predicate. Limits: 100 members per group, 10 levels, and 500 nodes. The negating operators include nulls and absent cells, multi-select included; combine with `isNotNull` or `isNotEmpty` to exclude them. Pattern operators use `*` as the only wildcard; `%`, `_`, and backslash are literal. Select operators: single-select uses `eq`/`ne`/`in`/`nin`; multi-select uses `contains`/`ncontains`; option names resolve to IDs. Full operand rules are documented on `op`.',
       },
     },
   },
@@ -13820,7 +13819,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { workflowId: 'Unique workflow identifier.' },
     responseMode: 'json',
     summary: 'Create or Replace Workflow Chat Deployment',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       identifier: {
         kind: 'string',
@@ -13876,7 +13875,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { workflowId: 'Unique workflow identifier.' },
     responseMode: 'json',
     summary: 'Replace Workflow State',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       dryRun: {
         kind: 'boolean',
@@ -14018,7 +14017,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Revert Workflow To Version',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
   },
   revokeSkillEditor: {
     method: 'DELETE',
@@ -14030,7 +14029,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Revoke Skill Editor',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: { kind: 'string', required: true, describe: 'Workspace that owns the skill.' },
       email: {
@@ -14047,7 +14046,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { workflowId: 'Unique workflow identifier.' },
     responseMode: 'json',
     summary: 'Rollback Workflow',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       version: {
         kind: 'integer',
@@ -14147,7 +14146,7 @@ export const V2_OPERATIONS = {
       tagFilters: {
         kind: 'array',
         describe:
-          'Structured tag filters, at most 10 of them. Every filter must hold, including two that name the same tag: repeating one tag narrows the result rather than widening it, matching `GET /api/v2/knowledge/{knowledgeBaseId}/documents`. To match either of two values for one tag, issue a search per value. Each filtered tag must resolve to the same slot and field type in every knowledge base selected; one missing from any of them, or defined inconsistently across them, is rejected rather than ignored, and those knowledge bases must be searched separately. List the available names with `GET /api/v2/knowledge/{knowledgeBaseId}/tags`.',
+          'Up to 10 filters combined with AND; repeating a tag narrows results. To express OR, run separate searches. Every tag must exist with the same slot and field type in each selected knowledge base or the request is rejected. List valid names with the knowledge-base tag-list operation.',
       },
       searchMode: {
         kind: 'enum',
@@ -14186,7 +14185,7 @@ export const V2_OPERATIONS = {
       predicate: {
         kind: 'unknown',
         describe:
-          'Recursive predicate tree. Each group node is exactly one non-empty `all` or `any` array whose members are further groups or `{ field, op, value }` conditions; the root must be a group, not a bare condition. At most 100 members per group, 10 levels of nesting, and 500 nodes in total. The negating operators include nulls: `ne`, `nin`, `ncontains`, `nlike`, and `nilike` match rows whose column is null or absent, so "not X" is not the complement of "X" over a nullable column. That holds for every column type, multi-select included. To exclude nulls, `all`-combine the negation with `isNotEmpty` (multi-select) or `isNotNull`. Comparison: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`. Membership: `in`, `nin` (array operand). Emptiness: `isEmpty`, `isNotEmpty`, `isNull`, `isNotNull` (no operand). Substring, always case-insensitive, operand matched literally: `contains`, `ncontains`, `startsWith`, `endsWith`. Pattern: `like`/`nlike` (case-sensitive), `ilike`/`nilike` (case-insensitive). **`*` is the only wildcard** and stands for any run of characters; `%`, `_`, and backslash match themselves. Use `like: "Hi*"`, not `like: "Hi%"`. A `select` column compares by option id and restricts its operators: single-select accepts `eq`, `ne`, `in`, `nin`; multi-select accepts `contains`, `ncontains`. Option names are accepted as operands and resolved to ids.',
+          'Recursive non-empty `all`/`any` groups containing groups or conditions; the root cannot be a condition. Limits: 100 members per group, 10 levels, and 500 nodes. The negating operators include nulls and absent cells, multi-select included; combine with `isNotNull` or `isNotEmpty` to exclude them. Pattern operators use `*` as the only wildcard; `%`, `_`, and backslash are literal. Select operators: single-select uses `eq`/`ne`/`in`/`nin`; multi-select uses `contains`/`ncontains`; option names resolve to IDs. Full operand rules are documented on `op`.',
       },
       sort: { kind: 'array', describe: 'Ordered table-row sort specification.' },
     },
@@ -14198,7 +14197,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { name: 'Secret to create or replace.' },
     responseMode: 'json',
     summary: 'Set Secret',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -14240,7 +14239,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Sync Knowledge Connector',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -14279,7 +14278,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { workflowId: 'Unique workflow identifier.' },
     responseMode: 'json',
     summary: 'Undeploy Workflow',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
   },
   undeployWorkflowMcpTool: {
     method: 'DELETE',
@@ -14291,7 +14290,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Unpublish Workflow MCP Tool',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
   },
   unzipFile: {
     method: 'POST',
@@ -14311,7 +14310,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { credentialId: 'Credential to update.' },
     responseMode: 'json',
     summary: 'Update Credential',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     query: {
       workspaceId: {
         kind: 'string',
@@ -14331,6 +14330,12 @@ export const V2_OPERATIONS = {
       },
       apiToken: { kind: 'string', describe: 'Write-only provider API token.' },
       domain: { kind: 'string', describe: 'Provider account domain.' },
+      atlassianProduct: {
+        kind: 'enum',
+        values: ['jira', 'confluence'] as const,
+        describe:
+          'Atlassian product to verify; defaults to Jira on create and preserves the saved product on reconnect.',
+      },
       signingSecret: { kind: 'string', describe: 'Write-only webhook signing secret.' },
       botToken: { kind: 'string', describe: 'Write-only bot token.' },
       clientId: { kind: 'string', describe: 'OAuth client identifier.' },
@@ -14414,7 +14419,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Update Chunk',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -14442,7 +14447,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Update Knowledge Connector',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -14475,7 +14480,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Update Knowledge Connector Documents',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -14505,7 +14510,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Update Document',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -14551,7 +14556,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Update Tag',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: {
         kind: 'string',
@@ -14585,8 +14590,7 @@ export const V2_OPERATIONS = {
         kind: 'enum',
         values: ['streamable-http'] as const,
         default: 'streamable-http',
-        describe:
-          'Transport used to communicate with the server. Applied server-side as `streamable-http` when omitted on create.',
+        describe: 'Transport protocol. Defaults to `streamable-http` on creation.',
       },
       url: {
         kind: 'string',
@@ -14607,19 +14611,17 @@ export const V2_OPERATIONS = {
       timeout: {
         kind: 'integer',
         default: 30000,
-        describe:
-          'Per-request timeout in milliseconds. Applied server-side as 30000 when omitted on create.',
+        describe: 'Per-request timeout in milliseconds. Defaults to 30000 on creation.',
       },
       retries: {
         kind: 'integer',
         default: 3,
-        describe: 'Number of retries per request. Applied server-side as 3 when omitted on create.',
+        describe: 'Number of retries per request. Defaults to 3 on creation.',
       },
       enabled: {
         kind: 'boolean',
         default: true,
-        describe:
-          'Whether the server tools are available to workflows. Applied server-side as true when omitted on create.',
+        describe: "Whether workflows can use the server's tools. Defaults to true on creation.",
       },
       oauthClientId: {
         kind: 'string',
@@ -14646,7 +14648,7 @@ export const V2_OPERATIONS = {
         kind: 'unknown',
         required: true,
         describe:
-          'Recursive predicate tree. Each group node is exactly one non-empty `all` or `any` array whose members are further groups or `{ field, op, value }` conditions; the root must be a group, not a bare condition. At most 100 members per group, 10 levels of nesting, and 500 nodes in total. The negating operators include nulls: `ne`, `nin`, `ncontains`, `nlike`, and `nilike` match rows whose column is null or absent, so "not X" is not the complement of "X" over a nullable column. That holds for every column type, multi-select included. To exclude nulls, `all`-combine the negation with `isNotEmpty` (multi-select) or `isNotNull`. Comparison: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`. Membership: `in`, `nin` (array operand). Emptiness: `isEmpty`, `isNotEmpty`, `isNull`, `isNotNull` (no operand). Substring, always case-insensitive, operand matched literally: `contains`, `ncontains`, `startsWith`, `endsWith`. Pattern: `like`/`nlike` (case-sensitive), `ilike`/`nilike` (case-insensitive). **`*` is the only wildcard** and stands for any run of characters; `%`, `_`, and backslash match themselves. Use `like: "Hi*"`, not `like: "Hi%"`. A `select` column compares by option id and restricts its operators: single-select accepts `eq`, `ne`, `in`, `nin`; multi-select accepts `contains`, `ncontains`. Option names are accepted as operands and resolved to ids.',
+          'Recursive non-empty `all`/`any` groups containing groups or conditions; the root cannot be a condition. Limits: 100 members per group, 10 levels, and 500 nodes. The negating operators include nulls and absent cells, multi-select included; combine with `isNotNull` or `isNotEmpty` to exclude them. Pattern operators use `*` as the only wildcard; `%`, `_`, and backslash are literal. Select operators: single-select uses `eq`/`ne`/`in`/`nin`; multi-select uses `contains`/`ncontains`; option names resolve to IDs. Full operand rules are documented on `op`.',
       },
       data: {
         kind: 'object',
@@ -14663,7 +14665,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { sandboxId: 'Unique sandbox identifier.' },
     responseMode: 'json',
     summary: 'Update Sandbox',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: { kind: 'string', required: true, describe: 'Workspace that owns the sandbox.' },
       name: {
@@ -14700,7 +14702,7 @@ export const V2_OPERATIONS = {
     },
     responseMode: 'json',
     summary: 'Update Skill',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: { kind: 'string', required: true, describe: 'Workspace that owns the skill.' },
       name: { kind: 'string', describe: 'New kebab-case skill name.' },
@@ -14840,7 +14842,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { serverId: 'Unique workflow-MCP server identifier.' },
     responseMode: 'json',
     summary: 'Update Workflow MCP Server',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       name: { kind: 'string', describe: 'Server display name, shown to connecting MCP clients.' },
       description: { kind: 'string', describe: 'New server description, or null to clear it.' },
@@ -14857,7 +14859,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { workflowId: 'Unique workflow identifier.' },
     responseMode: 'json',
     summary: 'Update Workflow Public API Access',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       isPublicApi: {
         kind: 'boolean',
@@ -14907,7 +14909,7 @@ export const V2_OPERATIONS = {
     pathParamDocs: { fileId: 'File identifier.' },
     responseMode: 'json',
     summary: 'Enable or Disable File Share',
-    personalKeyOnly: true,
+    workspaceKeyUnsupported: true,
     body: {
       workspaceId: { kind: 'string', required: true, describe: 'Workspace that owns the file.' },
       isActive: {

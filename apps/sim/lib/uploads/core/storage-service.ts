@@ -1,6 +1,7 @@
 import type { Readable } from 'node:stream'
 import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
+import { generateId } from '@sim/utils/id'
 import { readNodeStreamToBufferWithLimit } from '@/lib/core/utils/stream-limits'
 import {
   getStorageConfig,
@@ -10,7 +11,10 @@ import {
 } from '@/lib/uploads/config'
 import { LOCAL_UPLOAD_METADATA_SUFFIX } from '@/lib/uploads/core/storage-key'
 import type { AzureMultipartPart, BlobConfig } from '@/lib/uploads/providers/blob/types'
-import type { GcsConfig, GcsMultipartPart } from '@/lib/uploads/providers/gcs/types'
+import type {
+  GcsConfig,
+  GcsMultipartPart,
+} from '@/lib/uploads/providers/google-cloud-storage/types'
 import type { S3Config, S3MultipartPart } from '@/lib/uploads/providers/s3/types'
 import type {
   DeleteFileOptions,
@@ -87,19 +91,43 @@ async function insertFileMetadataHelper(
   context: StorageContext,
   fileName: string,
   contentType: string,
-  fileSize: number
+  fileSize: number,
+  uploadId?: string
 ): Promise<void> {
-  const { insertFileMetadata } = await import('../server/metadata')
-  await insertFileMetadata({
-    key,
-    userId: metadata.userId,
-    workspaceId: metadata.workspaceId || null,
-    folderId: metadata.folderId || null,
-    context,
-    originalName: metadata.originalName || fileName,
-    contentType,
-    size: fileSize,
-  })
+  const { insertFileMetadata, insertImmutableFileMetadata } = await import(
+    '@/lib/uploads/server/metadata'
+  )
+  const insertMetadata =
+    context === 'knowledge-base' ? insertImmutableFileMetadata : insertFileMetadata
+  try {
+    await insertMetadata({
+      key,
+      userId: metadata.userId,
+      workspaceId: metadata.workspaceId || null,
+      organizationId: metadata.organizationId || null,
+      folderId: metadata.folderId || null,
+      context,
+      originalName: metadata.originalName || fileName,
+      contentType,
+      size: fileSize,
+    })
+  } catch (error) {
+    if (uploadId) {
+      try {
+        const { cleanupUnboundKnowledgeUpload } = await import(
+          '@/lib/uploads/core/knowledge-upload-cleanup'
+        )
+        await cleanupUnboundKnowledgeUpload(key, uploadId)
+      } catch (cleanupError) {
+        logger.error('Failed to clean up an unbound knowledge upload', {
+          key,
+          uploadId,
+          error: cleanupError,
+        })
+      }
+    }
+    throw error
+  }
 }
 
 /**
@@ -122,6 +150,9 @@ export async function uploadFile(options: UploadFileOptions): Promise<FileInfo> 
   const config = getStorageConfig(context)
 
   const keyToUse = customKey || fileName
+  const uploadId =
+    context === 'knowledge-base' && metadata && persistMetadata ? generateId() : undefined
+  const objectMetadata = uploadId ? { ...metadata, uploadId } : metadata
 
   if (USE_BLOB_STORAGE) {
     const { uploadToBlob } = await import('@/lib/uploads/providers/blob/client')
@@ -132,7 +163,8 @@ export async function uploadFile(options: UploadFileOptions): Promise<FileInfo> 
       createBlobConfig(config),
       file.length,
       preserveKey,
-      metadata
+      objectMetadata,
+      Boolean(uploadId)
     )
 
     if (metadata && persistMetadata) {
@@ -142,7 +174,8 @@ export async function uploadFile(options: UploadFileOptions): Promise<FileInfo> 
         context,
         fileName,
         contentType,
-        file.length
+        file.length,
+        uploadId
       )
     }
 
@@ -158,7 +191,8 @@ export async function uploadFile(options: UploadFileOptions): Promise<FileInfo> 
       createS3Config(config),
       file.length,
       preserveKey,
-      metadata
+      objectMetadata,
+      Boolean(uploadId)
     )
 
     if (metadata && persistMetadata) {
@@ -168,7 +202,8 @@ export async function uploadFile(options: UploadFileOptions): Promise<FileInfo> 
         context,
         fileName,
         contentType,
-        file.length
+        file.length,
+        uploadId
       )
     }
 
@@ -176,7 +211,7 @@ export async function uploadFile(options: UploadFileOptions): Promise<FileInfo> 
   }
 
   if (USE_GCS_STORAGE) {
-    const { uploadToGcs } = await import('@/lib/uploads/providers/gcs/client')
+    const { uploadToGcs } = await import('@/lib/uploads/providers/google-cloud-storage/client')
     const uploadResult = await uploadToGcs(
       file,
       keyToUse,
@@ -184,7 +219,8 @@ export async function uploadFile(options: UploadFileOptions): Promise<FileInfo> 
       createGcsConfig(config),
       file.length,
       preserveKey,
-      metadata
+      objectMetadata,
+      Boolean(uploadId)
     )
 
     if (metadata && persistMetadata) {
@@ -194,7 +230,8 @@ export async function uploadFile(options: UploadFileOptions): Promise<FileInfo> 
         context,
         fileName,
         contentType,
-        file.length
+        file.length,
+        uploadId
       )
     }
 
@@ -211,7 +248,24 @@ export async function uploadFile(options: UploadFileOptions): Promise<FileInfo> 
 
   await mkdir(dirname(filesystemPath), { recursive: true })
 
-  await writeFile(filesystemPath, file)
+  if (uploadId) {
+    const { writeLocalPutObject } = await import('@/lib/uploads/upload-session/provider')
+    await writeLocalPutObject({
+      uploadId,
+      key: storageKey,
+      body: new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(file)
+          controller.close()
+        },
+      }),
+      expectedSize: file.length,
+      contentType,
+      metadata: objectMetadata ?? {},
+    })
+  } else {
+    await writeFile(filesystemPath, file)
+  }
 
   if (metadata && persistMetadata) {
     await insertFileMetadataHelper(
@@ -220,7 +274,8 @@ export async function uploadFile(options: UploadFileOptions): Promise<FileInfo> 
       context,
       fileName,
       contentType,
-      file.length
+      file.length,
+      uploadId
     )
   }
 
@@ -327,7 +382,7 @@ async function createGcsBackend(
     uploadGcsPart,
     completeGcsMultipartUpload,
     abortGcsMultipartUpload,
-  } = await import('@/lib/uploads/providers/gcs/client')
+  } = await import('@/lib/uploads/providers/google-cloud-storage/client')
   const { uploadId, key: uploadKey } = await initiateGcsMultipartUpload({
     fileName: key,
     contentType,
@@ -501,7 +556,9 @@ export async function downloadFile(options: DownloadFileOptions): Promise<Buffer
     }
 
     if (USE_GCS_STORAGE) {
-      const { downloadFromGcs } = await import('@/lib/uploads/providers/gcs/client')
+      const { downloadFromGcs } = await import(
+        '@/lib/uploads/providers/google-cloud-storage/client'
+      )
       const gcsConfig = createGcsConfig(config)
       return downloadFromGcs(key, gcsConfig, maxBytes, signal)
     }
@@ -559,7 +616,9 @@ export async function downloadFileStream(options: {
   }
 
   if (USE_GCS_STORAGE) {
-    const { downloadFromGcsStream } = await import('@/lib/uploads/providers/gcs/client')
+    const { downloadFromGcsStream } = await import(
+      '@/lib/uploads/providers/google-cloud-storage/client'
+    )
     return downloadFromGcsStream(key, createGcsConfig(config))
   }
 
@@ -589,7 +648,7 @@ export async function deleteFile(options: DeleteFileOptions): Promise<void> {
     }
 
     if (USE_GCS_STORAGE) {
-      const { deleteFromGcs } = await import('@/lib/uploads/providers/gcs/client')
+      const { deleteFromGcs } = await import('@/lib/uploads/providers/google-cloud-storage/client')
       return deleteFromGcs(key, createGcsConfig(config))
     }
   }
@@ -669,7 +728,7 @@ export async function headObject(
   }
 
   if (USE_GCS_STORAGE) {
-    const { headGcsObject } = await import('@/lib/uploads/providers/gcs/client')
+    const { headGcsObject } = await import('@/lib/uploads/providers/google-cloud-storage/client')
     return headGcsObject(key, createGcsConfig(config))
   }
 
@@ -707,7 +766,9 @@ export async function generatePresignedDownloadUrl(
   }
 
   if (USE_GCS_STORAGE) {
-    const { getPresignedUrlWithConfig } = await import('@/lib/uploads/providers/gcs/client')
+    const { getPresignedUrlWithConfig } = await import(
+      '@/lib/uploads/providers/google-cloud-storage/client'
+    )
     return getPresignedUrlWithConfig(key, createGcsConfig(config), expirationSeconds)
   }
 

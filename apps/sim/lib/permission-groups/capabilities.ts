@@ -53,6 +53,7 @@ export const CAPABILITY_IDS = [
   'workspace.create',
   'organization.member_directory',
   'cli.use',
+  'oauth_apps.use',
   'triggers.webhook',
   'copilot.tool_auto_approval',
   'sandboxes.use',
@@ -130,9 +131,8 @@ function allowlistDenies(allowed: readonly string[] | null, member: string): boo
  * What each capability means in terms of the stored config.
  *
  * `satisfies` rather than an annotation, so adding a capability still fails to
- * compile until it is given a rule — the same completeness gate
- * `FORBIDDEN_DETAIL_CODE_DESCRIPTIONS` uses — while each entry keeps its own
- * `kind`. Annotating would widen every entry to `CapabilityRule`, and
+ * compile until it is given a rule while each entry keeps its own `kind`.
+ * Annotating would widen every entry to `CapabilityRule`, and
  * {@link StaticPermissionGroupCapability} would then resolve to `never`,
  * silently rejecting every capability an operation tried to declare.
  */
@@ -386,6 +386,13 @@ export const CAPABILITY_RULES = {
     detailCode: 'PERMISSION_GROUP_CAPABILITY_BLOCKED',
     describe: 'The organization member directory',
     deniedBy: (config) => config.hideOrgMemberDirectory,
+  },
+  'oauth_apps.use': {
+    kind: 'static',
+    configKeys: ['disableOAuthAppAccess'],
+    detailCode: 'PERMISSION_GROUP_CAPABILITY_BLOCKED',
+    describe: 'OAuth app access',
+    deniedBy: (config) => config.disableOAuthAppAccess,
   },
   'cli.use': {
     kind: 'static',

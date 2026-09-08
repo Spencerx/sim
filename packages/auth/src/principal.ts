@@ -1,10 +1,13 @@
 export type Principal =
   | SessionPrincipal
   | PersonalApiKeyPrincipal
+  | OAuthAccessTokenPrincipal
   | WorkspaceApiKeyPrincipal
   | DelegatedPrincipal
+  | OrganizationDelegatedPrincipal
   | SystemPrincipal
   | CredentialGroupEnrollmentPrincipal
+  | ScimConnectionPrincipal
 
 export interface SessionPrincipal {
   kind: 'session'
@@ -18,10 +21,46 @@ export interface PersonalApiKeyPrincipal {
   keyId: string
 }
 
+/**
+ * A person acting through an OAuth access token a registered client obtained
+ * with their consent. The same authorization class as a personal API key — a
+ * human subject, governed by their permission group and by the workspace's
+ * personal-key policy — narrowed by `scopes` and bounded by `expiresAt`.
+ */
+export interface OAuthAccessTokenPrincipal {
+  kind: 'oauth_access_token'
+  userId: string
+  clientId: string
+  /** The `oauth_access_token` row id, never the token itself. */
+  tokenId: string
+  scopes: readonly string[]
+  expiresAt: Date
+}
+
 export interface WorkspaceApiKeyPrincipal {
   kind: 'workspace_api_key'
   workspaceId: string
   keyId: string
+}
+
+/** Operations a SCIM bearer credential may perform. Mirrors `ScimScope` in the schema. */
+export type ScimCredentialScope = 'users:read' | 'users:write' | 'groups:read' | 'groups:write'
+
+/**
+ * An organization's identity provider, authenticated by a SCIM bearer credential.
+ *
+ * It represents no human: a directory synchronizes on its own schedule, so
+ * attributing its writes to whoever last configured the connection would put a
+ * name on the audit trail that did not perform the change. The organization is
+ * carried by the credential rather than by the request, which is what keeps one
+ * tenant's directory from addressing another tenant's users.
+ */
+export interface ScimConnectionPrincipal {
+  kind: 'scim_connection'
+  organizationId: string
+  connectionId: string
+  credentialId: string
+  scopes: readonly ScimCredentialScope[]
 }
 
 export interface ExternalUserSubject {
@@ -124,17 +163,48 @@ export type BoundWorkflowExecutionDelegatedPrincipal = WorkflowExecutionDelegate
 
 export type DelegatedPrincipal = SubjectDelegatedPrincipal | WorkflowExecutionDelegatedPrincipal
 
+/** Search-only authority delegated by a current organization member. */
+export interface OrganizationDelegatedPrincipal {
+  kind: 'organization_delegated'
+  serviceId: 'copilot'
+  organizationId: string
+  subjectUserId: string
+  delegationId: string
+  audience: string
+  issuedAt: Date
+  expiresAt: Date
+  resourceScope: { chatId: string }
+}
+
 /** Bearer identity established by a currently valid Credential Group invitation. */
-export interface CredentialGroupEnrollmentPrincipal {
+interface CredentialGroupEnrollmentIdentity {
   kind: 'credential_group_enrollment'
-  workspaceId: string
+  userId: string
   credentialGroupId: string
   enrollmentId: string
   email: string
   invitationTokenHash: string
 }
 
+export type CredentialGroupEnrollmentPrincipal = CredentialGroupEnrollmentIdentity &
+  (
+    | { workspaceId: string; organizationId?: never }
+    | { organizationId: string; workspaceId?: never }
+  )
+
 export type DelegatedServiceId = DelegatedPrincipal['serviceId']
+
+/**
+ * A person reaching the API through a bearer credential of their own — a
+ * personal API key or an OAuth access token. The two are one authorization
+ * class, so a surface that distinguishes "a user is here" from "a workspace
+ * or service is here" asks this rather than naming either kind.
+ */
+export function isUserCredentialPrincipal(
+  principal: Principal
+): principal is PersonalApiKeyPrincipal | OAuthAccessTokenPrincipal {
+  return principal.kind === 'personal_api_key' || principal.kind === 'oauth_access_token'
+}
 
 export class PrincipalSubjectUserRequiredError extends Error {
   constructor(principalKind: Principal['kind']) {
@@ -184,6 +254,7 @@ export function resolvePrincipalExecutionActorUserId(principal: Principal): stri
 export type WorkflowExecutionPrincipal =
   | SessionPrincipal
   | PersonalApiKeyPrincipal
+  | OAuthAccessTokenPrincipal
   | WorkspaceApiKeyPrincipal
   | SubjectDelegatedPrincipal
   | SystemPrincipal
@@ -191,6 +262,7 @@ export type WorkflowExecutionPrincipal =
 type SerializedWorkflowExecutionPrincipal =
   | SessionPrincipal
   | PersonalApiKeyPrincipal
+  | (Omit<OAuthAccessTokenPrincipal, 'expiresAt'> & { expiresAt: string })
   | WorkspaceApiKeyPrincipal
   | SystemPrincipal
   | (Omit<SubjectDelegatedPrincipal, 'issuedAt' | 'expiresAt'> & {
@@ -292,6 +364,15 @@ export function serializePrincipal(principal: WorkflowExecutionPrincipal): Seria
     case 'personal_api_key':
     case 'workspace_api_key':
       return { version: 1, principal: { ...principal } }
+    case 'oauth_access_token':
+      return {
+        version: 1,
+        principal: {
+          ...principal,
+          scopes: [...principal.scopes],
+          expiresAt: principal.expiresAt.toISOString(),
+        },
+      }
     case 'system':
       if (principal.serviceId === 'webhook') {
         if (principal.subject && principal.subject.provider !== principal.provider) {
@@ -341,6 +422,20 @@ export function parsePrincipal(value: unknown): WorkflowExecutionPrincipal {
         workspaceId: requireString(principal.workspaceId, 'workspaceId'),
         keyId: requireString(principal.keyId, 'keyId'),
       }
+    case 'oauth_access_token': {
+      requireExactKeys(principal, ['kind', 'userId', 'clientId', 'tokenId', 'scopes', 'expiresAt'])
+      if (!Array.isArray(principal.scopes)) {
+        throw new Error('Serialized principal scopes must be an array')
+      }
+      return {
+        kind,
+        userId: requireString(principal.userId, 'userId'),
+        clientId: requireString(principal.clientId, 'clientId'),
+        tokenId: requireString(principal.tokenId, 'tokenId'),
+        scopes: principal.scopes.map((scope, index) => requireString(scope, `scopes[${index}]`)),
+        expiresAt: requireDate(principal.expiresAt, 'expiresAt'),
+      }
+    }
     case 'system': {
       requireExactKeys(
         principal,
@@ -445,8 +540,16 @@ export function parsePrincipal(value: unknown): WorkflowExecutionPrincipal {
 }
 
 export type PrincipalActor =
+  | {
+      kind: 'organization_delegated'
+      serviceId: 'copilot'
+      subjectUserId: string
+      organizationId: string
+      delegationId: string
+    }
   | { kind: 'session'; userId: string }
   | { kind: 'personal_api_key'; keyId: string; userId: string }
+  | { kind: 'oauth_access_token'; tokenId: string; clientId: string; userId: string }
   | { kind: 'workspace_api_key'; keyId: string; workspaceId: string }
   | {
       kind: 'system'
@@ -465,10 +568,17 @@ export type PrincipalActor =
     }
   | {
       kind: 'credential_group_enrollment'
-      workspaceId: string
+      workspaceId?: string
+      organizationId?: string
       credentialGroupId: string
       enrollmentId: string
       email: string
+    }
+  | {
+      kind: 'scim_connection'
+      organizationId: string
+      connectionId: string
+      credentialId: string
     }
 
 export interface PrincipalAttribution {
@@ -504,7 +614,10 @@ export function resolvePrincipalSubject(principal: Principal): PrincipalSubject 
   switch (principal.kind) {
     case 'session':
     case 'personal_api_key':
+    case 'oauth_access_token':
       return { kind: 'sim_user', userId: principal.userId }
+    case 'organization_delegated':
+      return { kind: 'sim_user', userId: principal.subjectUserId }
     case 'delegated':
       if (principal.serviceId !== 'executor') {
         return { kind: 'sim_user', userId: principal.subjectUserId }
@@ -519,6 +632,7 @@ export function resolvePrincipalSubject(principal: Principal): PrincipalSubject 
         : null
     case 'workspace_api_key':
     case 'credential_group_enrollment':
+    case 'scim_connection':
       return null
   }
 }
@@ -529,6 +643,13 @@ export function toPrincipalActor(principal: Principal): PrincipalActor {
       return { kind: principal.kind, userId: principal.userId }
     case 'personal_api_key':
       return { kind: principal.kind, keyId: principal.keyId, userId: principal.userId }
+    case 'oauth_access_token':
+      return {
+        kind: principal.kind,
+        tokenId: principal.tokenId,
+        clientId: principal.clientId,
+        userId: principal.userId,
+      }
     case 'workspace_api_key':
       return {
         kind: principal.kind,
@@ -558,13 +679,30 @@ export function toPrincipalActor(principal: Principal): PrincipalActor {
         ...(principal.subjectUserId ? { subjectUserId: principal.subjectUserId } : {}),
         delegationId: principal.delegationId,
       }
+    case 'organization_delegated':
+      return {
+        kind: principal.kind,
+        serviceId: principal.serviceId,
+        subjectUserId: principal.subjectUserId,
+        organizationId: principal.organizationId,
+        delegationId: principal.delegationId,
+      }
     case 'credential_group_enrollment':
       return {
         kind: principal.kind,
-        workspaceId: principal.workspaceId,
+        ...(principal.organizationId
+          ? { organizationId: principal.organizationId }
+          : { workspaceId: principal.workspaceId }),
         credentialGroupId: principal.credentialGroupId,
         enrollmentId: principal.enrollmentId,
         email: principal.email,
+      }
+    case 'scim_connection':
+      return {
+        kind: principal.kind,
+        organizationId: principal.organizationId,
+        connectionId: principal.connectionId,
+        credentialId: principal.credentialId,
       }
   }
 }
@@ -574,9 +712,11 @@ export function resolvePrincipalAuditAttribution(principal: Principal): Principa
 
   switch (actor.kind) {
     case 'session':
-      return { actor, actorId: actor.userId }
     case 'personal_api_key':
+    case 'oauth_access_token':
       return { actor, actorId: actor.userId }
+    case 'organization_delegated':
+      return { actor, actorId: actor.subjectUserId }
     case 'delegated':
       return actor.subjectUserId
         ? { actor, actorId: actor.subjectUserId }
@@ -587,6 +727,8 @@ export function resolvePrincipalAuditAttribution(principal: Principal): Principa
       return { actor, actorId: null, actorName: `System: ${actor.serviceId}` }
     case 'credential_group_enrollment':
       return { actor, actorId: null, actorName: actor.email }
+    case 'scim_connection':
+      return { actor, actorId: null, actorName: 'SCIM provisioning' }
   }
 }
 
@@ -604,6 +746,7 @@ export function resolvePrincipalAttribution(
   switch (actor.kind) {
     case 'session':
     case 'personal_api_key':
+    case 'oauth_access_token':
       return { actor, attributedUserId: actor.userId }
     case 'workspace_api_key': {
       const attributedUserId = context.workspaceBillingOwnerUserId
@@ -614,6 +757,8 @@ export function resolvePrincipalAttribution(
     }
     case 'system':
       throw new Error('System principals do not support user attribution')
+    case 'organization_delegated':
+      return { actor, attributedUserId: actor.subjectUserId }
     case 'delegated': {
       if (actor.subjectUserId) return { actor, attributedUserId: actor.subjectUserId }
       if (actor.serviceId !== 'executor') throw new PrincipalSubjectUserRequiredError(actor.kind)
@@ -622,6 +767,7 @@ export function resolvePrincipalAttribution(
       return { actor, attributedUserId }
     }
     case 'credential_group_enrollment':
+    case 'scim_connection':
       throw new PrincipalSubjectUserRequiredError(actor.kind)
   }
 }

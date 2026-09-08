@@ -661,7 +661,6 @@ interface SlackBaseParams {
   authMethod: 'oauth' | 'bot_token'
   accessToken: string
   botToken: string
-  credentialType?: 'oauth' | 'managed_oauth' | 'service_account'
 }
 
 export type SlackAgentSessionStatus = 'active' | 'processing' | 'suspended' | 'closed'
@@ -750,6 +749,7 @@ export interface SlackListChannelsParams extends SlackBaseParams {
   excludeArchived?: boolean
   limit?: number
   cursor?: string
+  maxPages?: number
 }
 
 export interface SlackListMembersParams extends SlackBaseParams {
@@ -1162,7 +1162,9 @@ export interface SlackListChannelsResponse extends ToolResponse {
     ids: string[]
     names: string[]
     count: number
+    hasMore: boolean
     nextCursor: string | null
+    pages: number
   }
 }
 

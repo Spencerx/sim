@@ -1483,11 +1483,32 @@ cronjobs:
       successfulJobsHistoryLimit: 3
       failedJobsHistoryLimit: 1
 
+    connectorDirectorySync:
+      enabled: true
+      name: connector-directory-sync
+      schedule: "*/5 * * * *"
+      path: "/api/knowledge/connectors/directory-sync"
+      concurrencyPolicy: Forbid
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 1
+
     runDataDrains:
       enabled: true
       name: run-data-drains
       schedule: "0 * * * *"
       path: "/api/cron/run-data-drains"
+      concurrencyPolicy: Forbid
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 1
+
+    # Re-applies directory group mappings so drift between what a mapping says a
+    # member should have and what SCIM granted them cannot persist. Idempotent,
+    # and a no-op for organizations with no connection.
+    scimReconcile:
+      enabled: true
+      name: scim-reconcile
+      schedule: "17 * * * *"
+      path: "/api/cron/scim-reconcile"
       concurrencyPolicy: Forbid
       successfulJobsHistoryLimit: 3
       failedJobsHistoryLimit: 1
@@ -1498,6 +1519,17 @@ cronjobs:
       name: cleanup-table-row-ttl
       schedule: "*/15 * * * *"
       path: "/api/cron/cleanup-table-row-ttl"
+      concurrencyPolicy: Forbid
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 1
+
+    # Deletes OAuth token rows after the retention tail, including historical
+    # rows after the provider is disabled.
+    cleanupOAuthTokens:
+      enabled: true
+      name: cleanup-oauth-tokens
+      schedule: "0 * * * *"
+      path: "/api/cron/cleanup-oauth-tokens"
       concurrencyPolicy: Forbid
       successfulJobsHistoryLimit: 3
       failedJobsHistoryLimit: 1
