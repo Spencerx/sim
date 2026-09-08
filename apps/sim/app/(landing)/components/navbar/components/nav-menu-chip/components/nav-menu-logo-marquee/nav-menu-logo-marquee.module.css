@@ -1,0 +1,24 @@
+.track {
+  animation: marquee 16s linear infinite;
+}
+
+.viewport:hover .track,
+.viewport:focus-visible .track,
+.viewport[data-dragging] .track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track {
+    animation-play-state: paused;
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}

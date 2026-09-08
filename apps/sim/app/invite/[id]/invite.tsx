@@ -24,6 +24,11 @@ const logger = createLogger('InviteById')
 /** Workspace names listed in the invitation title before collapsing into an "and N more" tail. */
 const MAX_LISTED_WORKSPACE_NAMES = 3
 
+/** A document navigation, so the marketing surface initializes its own theme store. */
+function returnHome(): void {
+  window.location.href = '/'
+}
+
 /**
  * Goes through the shared builder so the invite page cannot drift from the
  * cross-link shape the auth pages use.
@@ -408,10 +413,7 @@ export default function Invite({ registrationDisabled }: InviteProps) {
           title="You've been invited!"
           description={prompt.description}
           icon='userPlus'
-          actions={[
-            ...prompt.actions,
-            { label: 'Return to Home', onClick: () => router.push('/') },
-          ]}
+          actions={[...prompt.actions, { label: 'Return to Home', onClick: returnHome }]}
         />
       </InviteLayout>
     )
@@ -444,7 +446,7 @@ export default function Invite({ registrationDisabled }: InviteProps) {
                   router.push(inviteAuthLink('/login', callbackUrl))
                 },
               },
-              { label: 'Return to Home', onClick: () => router.push('/') },
+              { label: 'Return to Home', onClick: returnHome },
             ]}
           />
         </InviteLayout>
@@ -461,7 +463,7 @@ export default function Invite({ registrationDisabled }: InviteProps) {
             icon='users'
             actions={[
               { label: 'Manage Team Settings', onClick: () => router.push(APP_ENTRY_PATH) },
-              { label: 'Return to Home', onClick: () => router.push('/') },
+              { label: 'Return to Home', onClick: returnHome },
             ]}
           />
         </InviteLayout>
@@ -489,7 +491,7 @@ export default function Invite({ registrationDisabled }: InviteProps) {
                       onClick: () => router.push(inviteAuthLink('/signup', callbackUrl)),
                     },
                   ]),
-              { label: 'Return to Home', onClick: () => router.push('/') },
+              { label: 'Return to Home', onClick: returnHome },
             ]}
           />
         </InviteLayout>
@@ -500,7 +502,7 @@ export default function Invite({ registrationDisabled }: InviteProps) {
     if (error.canRetry) {
       actions.push({ label: 'Try Again', onClick: () => window.location.reload() })
     }
-    actions.push({ label: 'Return to Home', onClick: () => router.push('/') })
+    actions.push({ label: 'Return to Home', onClick: returnHome })
 
     return (
       <InviteLayout>
@@ -539,7 +541,7 @@ export default function Invite({ registrationDisabled }: InviteProps) {
           title='Welcome!'
           description={`You have successfully joined ${displayName}. Redirecting...`}
           icon='success'
-          actions={[{ label: 'Return to Home', onClick: () => router.push('/') }]}
+          actions={[{ label: 'Return to Home', onClick: returnHome }]}
         />
       </InviteLayout>
     )
@@ -561,7 +563,7 @@ export default function Invite({ registrationDisabled }: InviteProps) {
             disabled: isAccepting,
             loading: isAccepting,
           },
-          { label: 'Return to Home', onClick: () => router.push('/') },
+          { label: 'Return to Home', onClick: returnHome },
         ]}
       />
     </InviteLayout>
