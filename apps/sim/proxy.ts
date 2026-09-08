@@ -1,6 +1,7 @@
 import { createLogger } from '@sim/logger'
 import { getSessionCookie } from 'better-auth/cookies'
 import { type NextRequest, NextResponse } from 'next/server'
+import { APP_ENTRY_PATH, isAppSurfacePath } from '@/lib/navigation/paths'
 import { isOAuthAuthorizationCallback, resolveAuthRedirect } from '@/app/(auth)/auth-redirect'
 import { getEnv } from './lib/core/config/env'
 import { isAuthDisabled, isDev, isHosted } from './lib/core/config/env-flags'
@@ -214,18 +215,18 @@ function handleRootPathRedirects(
   if (!isHosted && !isDev) {
     // Self-hosted production: Always redirect based on session.
     if (hasActiveSession) {
-      return NextResponse.redirect(new URL('/workspace', request.url))
+      return NextResponse.redirect(new URL(APP_ENTRY_PATH, request.url))
     }
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // For root path, redirect authenticated users to workspace
+  // For root path, redirect authenticated users into the app
   // Unless they have a 'home' query parameter (e.g., ?home)
   // This allows intentional navigation to the homepage from anywhere in the app
   if (hasActiveSession) {
     const isBrowsingHome = url.searchParams.has('home')
     if (!isBrowsingHome) {
-      return NextResponse.redirect(new URL('/workspace', request.url))
+      return NextResponse.redirect(new URL(APP_ENTRY_PATH, request.url))
     }
   }
 
@@ -336,7 +337,10 @@ export function proxy(request: NextRequest) {
     const isOAuthSignIn =
       isOAuthAuthorizationCallback(rawCallbackUrl, url.origin) && !isAuthDisabled
     if (hasActiveSession && !isOAuthSignIn) {
-      return applyIndexingPolicy(request, NextResponse.redirect(new URL('/workspace', request.url)))
+      return applyIndexingPolicy(
+        request,
+        NextResponse.redirect(new URL(APP_ENTRY_PATH, request.url))
+      )
     }
     const response = NextResponse.next()
     response.headers.set('Content-Security-Policy', generateRuntimeCSP())
@@ -350,7 +354,7 @@ export function proxy(request: NextRequest) {
     return applyIndexingPolicy(request, NextResponse.next())
   }
 
-  if (url.pathname.startsWith('/workspace')) {
+  if (isAppSurfacePath(url.pathname)) {
     if (!hasActiveSession) {
       return applyIndexingPolicy(request, NextResponse.redirect(new URL('/login', request.url)))
     }
@@ -407,6 +411,9 @@ export const config = {
     '/w', // Legacy /w redirect
     '/w/:path*', // Legacy /w/* redirects
     '/workspace/:path*', // New workspace routes
+    '/home', // App entry
+    '/o', // Organization surface
+    '/o/:path*',
     '/login',
     '/signup',
     '/invite/:path*', // Match invitation routes

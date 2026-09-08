@@ -150,7 +150,7 @@ describe('OAuth login bridge', () => {
         })
       )
       expect(response.status).toBe(307)
-      expect(response.headers.get('location')).toBe('https://sim.test/workspace')
+      expect(response.headers.get('location')).toBe('https://sim.test/home')
     }
   })
 

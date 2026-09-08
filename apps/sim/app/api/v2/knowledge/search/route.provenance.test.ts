@@ -113,6 +113,13 @@ import { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-tr
 const provider = vi.hoisted(() => ({ fetch: vi.fn(), decrypt: vi.fn() }))
 vi.mock('@/lib/api/server/routes/v2-api-key-auth', () => v2ApiKeyAuthModuleMock)
 vi.mock('@/lib/core/rate-limiter', () => v2RateLimiterModuleMock)
+vi.mock('@/lib/core/rate-limiter/storage/factory', () => ({
+  createStorageAdapter: () => ({
+    consumeTokensAtomically: async () => ({ allowed: true, retryAfterMs: 0 }),
+    getCooldownUntil: async () => null,
+    setCooldownUntil: async () => undefined,
+  }),
+}))
 vi.mock('@/lib/api-key/byok', () => ({ getBYOKKey: async () => null }))
 vi.mock('@/lib/core/security/encryption', () => ({ decryptSecret: provider.decrypt }))
 
@@ -267,7 +274,8 @@ describe('Knowledge search provenance through the V2 route and reranker HTTP bou
       expect(mocks.generateEmbedding).toHaveBeenCalledWith(
         requestInput.query,
         expect.anything(),
-        'workspace-1'
+        'workspace-1',
+        undefined
       )
     }
   )
