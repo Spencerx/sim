@@ -239,6 +239,23 @@ export const AuditAction = {
   WORKSPACE_FORK_ROLLED_BACK: 'workspace.fork_rolled_back',
   WORKSPACE_FORK_UNLINKED: 'workspace.fork_unlinked',
   WORKSPACE_EXPORTED: 'workspace.exported',
+  // SCIM directory provisioning
+  SCIM_CONNECTION_ENABLED: 'scim_connection.enabled',
+  SCIM_CONNECTION_DISABLED: 'scim_connection.disabled',
+  SCIM_CONNECTION_SETTINGS_UPDATED: 'scim_connection.settings_updated',
+  SCIM_CREDENTIAL_ISSUED: 'scim_credential.issued',
+  SCIM_CREDENTIAL_REVOKED: 'scim_credential.revoked',
+  SCIM_USER_PROVISIONED: 'scim_user.provisioned',
+  SCIM_USER_UPDATED: 'scim_user.updated',
+  SCIM_USER_DEACTIVATED: 'scim_user.deactivated',
+  SCIM_USER_REACTIVATED: 'scim_user.reactivated',
+  SCIM_USER_DEPROVISIONED: 'scim_user.deprovisioned',
+  SCIM_GROUP_CREATED: 'scim_group.created',
+  SCIM_GROUP_UPDATED: 'scim_group.updated',
+  SCIM_GROUP_MEMBERSHIP_CHANGED: 'scim_group.membership_changed',
+  SCIM_GROUP_DELETED: 'scim_group.deleted',
+  SCIM_GROUP_MAPPING_UPSERTED: 'scim_group_mapping.upserted',
+  SCIM_GROUP_MAPPING_DELETED: 'scim_group_mapping.deleted',
 } as const
 
 export type AuditActionType = (typeof AuditAction)[keyof typeof AuditAction]
@@ -271,11 +288,14 @@ export const AuditResourceType = {
   PERMISSION_GROUP: 'permission_group',
   SANDBOX: 'sandbox',
   SCHEDULE: 'schedule',
+  SCIM_CONNECTION: 'scim_connection',
+  SCIM_GROUP: 'scim_group',
   /** Not a stored resource: the workspace's secrets, as the thing put at risk. */
   SECRET_PROVENANCE: 'secret_provenance',
   SKILL: 'skill',
   SUBSCRIPTION: 'subscription',
   TABLE: 'table',
+  USER: 'user',
   WEBHOOK: 'webhook',
   WORKFLOW: 'workflow',
   WORKSPACE: 'workspace',

@@ -72,6 +72,7 @@ interface ApiKeyRow {
   type: string
   expiresAt: Date | null
   userBanned: boolean | null
+  userSuspendedAt: Date | null
 }
 
 function requireValidRow(row: ApiKeyRow | undefined): ApiKeyRow {
@@ -83,6 +84,11 @@ function requireValidRow(row: ApiKeyRow | undefined): ApiKeyRow {
       throw new Error(`Personal API key ${row.id} is missing its credential owner`)
     }
     if (row.userBanned) throw new V2ApiKeyUnauthenticatedError()
+    /**
+     * A suspension keeps the account's resources — and therefore its keys —
+     * intact, so refusing the key here is what ends its machine access.
+     */
+    if (row.userSuspendedAt) throw new V2ApiKeyUnauthenticatedError()
     return row
   }
   if (row.type === 'workspace' && row.workspaceId) return row
@@ -103,6 +109,7 @@ async function authenticateApiKey(apiKeyHeader: string): Promise<V2ApiKeyAuthCon
       type: apiKey.type,
       expiresAt: apiKey.expiresAt,
       userBanned: user.banned,
+      userSuspendedAt: user.suspendedAt,
     })
     .from(apiKey)
     .leftJoin(user, eq(apiKey.userId, user.id))

@@ -4018,7 +4018,8 @@
           "CONNECTOR_MANAGED_RESOURCE_READ_ONLY",
           "PERMISSION_GROUP_CAPABILITY_BLOCKED",
           "INTEGRATION_NOT_ALLOWED",
-          "INSUFFICIENT_SCOPE"
+          "INSUFFICIENT_SCOPE",
+          "SCIM_MANAGED_MEMBERSHIP"
         ],
         "title": "Forbidden detail code",
         "description": "Stable cause code for an actionable `403` response."

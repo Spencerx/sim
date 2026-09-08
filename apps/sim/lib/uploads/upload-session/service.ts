@@ -482,6 +482,11 @@ export function createUploadSessionAuthBinding(
         'forbidden',
         'Credential Group enrollment principals cannot create uploads'
       )
+    case 'scim_connection':
+      throw new UploadSessionError(
+        'forbidden',
+        'Directory provisioning credentials cannot create uploads'
+      )
     case 'system':
       throw new UploadSessionError('forbidden', 'System principals cannot create uploads')
   }

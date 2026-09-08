@@ -88,8 +88,18 @@ export function assertOperationOAuthPolicy(
  * Every principal kind an operation can name. `credential_group_enrollment`
  * authenticates one enrollment flow, while `system` is an infrastructure-owned
  * workflow execution identity; neither performs a semantic resource operation.
+ *
+ * `scim_connection` is excluded for a different reason: it is an organization's
+ * identity provider, which provisions membership and never reads or writes a
+ * workspace resource. Leaving it out makes that a compile-time fact — a
+ * workspace operation cannot name it even by accident — and SCIM declares its
+ * own operation type in `ee/scim/lib/application/operations.ts`, the way
+ * organization BYOK does.
  */
-export type PrincipalKind = Exclude<Principal['kind'], 'credential_group_enrollment' | 'system'>
+export type PrincipalKind = Exclude<
+  Principal['kind'],
+  'credential_group_enrollment' | 'system' | 'scim_connection'
+>
 
 /**
  * A principal kind a non-workspace operation may name. `delegated` is excluded

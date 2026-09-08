@@ -6,6 +6,7 @@ export type Principal =
   | DelegatedPrincipal
   | SystemPrincipal
   | CredentialGroupEnrollmentPrincipal
+  | ScimConnectionPrincipal
 
 export interface SessionPrincipal {
   kind: 'session'
@@ -39,6 +40,26 @@ export interface WorkspaceApiKeyPrincipal {
   kind: 'workspace_api_key'
   workspaceId: string
   keyId: string
+}
+
+/** Operations a SCIM bearer credential may perform. Mirrors `ScimScope` in the schema. */
+export type ScimCredentialScope = 'users:read' | 'users:write' | 'groups:read' | 'groups:write'
+
+/**
+ * An organization's identity provider, authenticated by a SCIM bearer credential.
+ *
+ * It represents no human: a directory synchronizes on its own schedule, so
+ * attributing its writes to whoever last configured the connection would put a
+ * name on the audit trail that did not perform the change. The organization is
+ * carried by the credential rather than by the request, which is what keeps one
+ * tenant's directory from addressing another tenant's users.
+ */
+export interface ScimConnectionPrincipal {
+  kind: 'scim_connection'
+  organizationId: string
+  connectionId: string
+  credentialId: string
+  scopes: readonly ScimCredentialScope[]
 }
 
 export interface ExternalUserSubject {
@@ -525,6 +546,12 @@ export type PrincipalActor =
       enrollmentId: string
       email: string
     }
+  | {
+      kind: 'scim_connection'
+      organizationId: string
+      connectionId: string
+      credentialId: string
+    }
 
 export interface PrincipalAttribution {
   actor: PrincipalActor
@@ -575,6 +602,7 @@ export function resolvePrincipalSubject(principal: Principal): PrincipalSubject 
         : null
     case 'workspace_api_key':
     case 'credential_group_enrollment':
+    case 'scim_connection':
       return null
   }
 }
@@ -629,6 +657,13 @@ export function toPrincipalActor(principal: Principal): PrincipalActor {
         enrollmentId: principal.enrollmentId,
         email: principal.email,
       }
+    case 'scim_connection':
+      return {
+        kind: principal.kind,
+        organizationId: principal.organizationId,
+        connectionId: principal.connectionId,
+        credentialId: principal.credentialId,
+      }
   }
 }
 
@@ -650,6 +685,8 @@ export function resolvePrincipalAuditAttribution(principal: Principal): Principa
       return { actor, actorId: null, actorName: `System: ${actor.serviceId}` }
     case 'credential_group_enrollment':
       return { actor, actorId: null, actorName: actor.email }
+    case 'scim_connection':
+      return { actor, actorId: null, actorName: 'SCIM provisioning' }
   }
 }
 
@@ -686,6 +723,7 @@ export function resolvePrincipalAttribution(
       return { actor, attributedUserId }
     }
     case 'credential_group_enrollment':
+    case 'scim_connection':
       throw new PrincipalSubjectUserRequiredError(actor.kind)
   }
 }
