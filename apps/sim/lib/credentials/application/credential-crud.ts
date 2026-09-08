@@ -15,6 +15,7 @@ import {
 } from '@/lib/credentials/application/authorized-credential-use-case'
 import { resolveCredentialApplicationContext } from '@/lib/credentials/application/credential-context'
 import { credentialOperations } from '@/lib/credentials/application/operations'
+import { requireWorkspacePersonalAccounts } from '@/lib/credentials/application/workspace-personal-accounts'
 import { syncWorkspaceOAuthCredentialsForUser } from '@/lib/credentials/oauth'
 import {
   createCredentialRecord,
@@ -230,11 +231,17 @@ export const createWorkspaceCredential = defineAuthorizedWorkspaceUseCase({
     }
     const result =
       input.type === 'personal_token'
-        ? await createPersonalTokenCredential({ ...input, userId })
+        ? await createPersonalTokenCredential({
+            ...input,
+            userId,
+            accounts: await requireWorkspacePersonalAccounts(principal, context),
+          })
         : await createCredentialRecord({ ...input, userId }, { authorizeWorkspace: false })
     if (!result.success) throwCredentialMutationFailure(result)
     if (!result.credential) throw new Error('Credential creation succeeded without a credential')
-    const access = await getCredentialActorContext(result.credential.id, userId)
+    const access = await getCredentialActorContext(result.credential.id, userId, {
+      workspaceId: context.workspaceId,
+    })
     if (!access.credential || !canUseCredential(access)) {
       throw new Error('Created credential is not visible to its creator')
     }
@@ -284,6 +291,7 @@ export const createWorkspaceCredential = defineAuthorizedWorkspaceUseCase({
 
 export interface GetWorkspaceCredentialInput {
   credentialId: string
+  assertedWorkspaceId?: string
 }
 
 export const getWorkspaceCredentialUseCase = defineAuthorizedCredentialUseCase({
@@ -300,9 +308,9 @@ export type UpdateWorkspaceCredentialInput = Omit<
   'userId' | 'actorName' | 'actorEmail' | 'allowedTypes' | 'reason' | 'request'
 > & {
   /**
-   * Workspace the caller asserts owns the credential; a mismatch is concealed as
-   * a not-found. The internal surface omits it and resolves the credential's own
-   * workspace instead, which is what it did before this field existed.
+   * Execution workspace asserted by the caller. Required for organization personal
+   * tokens; workspace-owned credentials can resolve their own workspace when omitted.
+   * A mismatched owner organization or workspace is concealed as a not-found.
    */
   assertedWorkspaceId?: string
 }
@@ -339,7 +347,8 @@ export const updateWorkspaceCredentialUseCase = defineAuthorizedCredentialUseCas
     if (!result.success) throwCredentialMutationFailure(result)
     const access = await getCredentialActorContext(
       context.credential.id,
-      requirePrincipalSubjectUserId(principal)
+      requirePrincipalSubjectUserId(principal),
+      { workspaceId: context.workspaceId }
     )
     if (!access.credential || !access.isAdmin) {
       throw new Error('Updated credential is no longer visible to its administrator')
