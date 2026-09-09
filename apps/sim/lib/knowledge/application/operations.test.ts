@@ -12,6 +12,7 @@ describe('knowledge operation registry', () => {
     expect(ids).toEqual([
       'knowledge.list',
       'knowledge.read',
+      'knowledge.export',
       'knowledge.create',
       'knowledge.update',
       'knowledge.delete',
@@ -57,7 +58,10 @@ describe('knowledge operation registry', () => {
       'knowledge.connectors.update',
       'knowledge.connectors.access.update',
       'knowledge.search.sources.list',
+      'knowledge.search.sources.overview',
+      'knowledge.search.sources.progress',
       'knowledge.search.integrations.list',
+      'knowledge.search.integrations.overview',
       'knowledge.search.integrations.approve',
       'knowledge.connectors.members.list',
       'knowledge.connectors.members.enroll',
@@ -212,14 +216,24 @@ describe('knowledge operation registry', () => {
     ).toBe(true)
   })
 
-  it('allows delegated callers only on semantic knowledge and document operations', () => {
+  it('allows Copilot folder discovery without delegating folder mutations or upload completion', () => {
     expect(knowledgeOperations.list.principalKinds).toContain('delegated')
     expect(knowledgeOperations.search.principalKinds).toContain('delegated')
     expect(knowledgeOperations.uploadDocument.principalKinds).toContain('delegated')
     expect(knowledgeOperations.updateDocument.principalKinds).toContain('delegated')
     expect(knowledgeOperations.updateTag.principalKinds).toContain('delegated')
     expect(knowledgeOperations.syncConnector.principalKinds).toContain('delegated')
-    expect(knowledgeOperations.listFolders.principalKinds).not.toContain('delegated')
+    expect(knowledgeOperations.listFolders.principalKinds).toContain('delegated')
+    expect(knowledgeOperations.listFolders.delegatedServices).toEqual(['copilot'])
+    expect(knowledgeOperations.listFolders.minimumRole).toBe('read')
+    for (const operation of [
+      knowledgeOperations.createFolder,
+      knowledgeOperations.relocateFolder,
+      knowledgeOperations.deleteFolder,
+    ]) {
+      expect(operation.principalKinds).not.toContain('delegated')
+      expect(operation.delegatedServices).toBeUndefined()
+    }
     expect(knowledgeOperations.uploadComplete.principalKinds).not.toContain('delegated')
     expect(knowledgeOperations.list.delegatedServices).toEqual(['copilot'])
     expect(knowledgeOperations.search.delegatedServices).toEqual(['copilot', 'executor'])

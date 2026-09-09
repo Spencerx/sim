@@ -7,6 +7,7 @@ import type {
   SearchSourceSummary,
   WorkspaceMemberConnector,
 } from '@/lib/api/contracts/knowledge/connectors'
+import { SEARCH_DEBOUNCE_MS } from '@/lib/url-state'
 
 const mocks = vi.hoisted(() => ({
   canAdmin: false,
@@ -40,10 +41,14 @@ vi.mock('@/hooks/queries/workspace', () => ({
 }))
 vi.mock('@/hooks/queries/kb/connectors', () => ({
   searchSourceKeys: { list: (id: string) => ['search-sources', id] },
-  useSearchSources: (id: string) => {
-    mocks.sourceQuery(id)
+  useSearchSources: (id: string, options: { search: string }) => {
+    mocks.sourceQuery(id, options)
     return {
-      data: mocks.sources,
+      data: mocks.sources.filter((source) =>
+        `${source.connectorType.replaceAll('_', ' ')} ${source.sourceDescription}`
+          .toLowerCase()
+          .includes(options.search.trim().toLowerCase())
+      ),
       isPending: mocks.sourcePending,
       isError: Boolean(mocks.sourceError),
       error: mocks.sourceError,
@@ -80,9 +85,6 @@ vi.mock('@/app/workspace/[workspaceId]/integrations/hooks/use-scroll-restoration
 vi.mock('@/app/workspace/[workspaceId]/components', () => ({ IntegrationTabsHeader: () => null }))
 vi.mock('@/app/workspace/[workspaceId]/integrations/components/integrations-showcase', () => ({
   IntegrationTile: () => null,
-}))
-vi.mock('@/app/workspace/[workspaceId]/search/components/search-mcp-setup', () => ({
-  SearchMcpSetup: () => <div data-testid='mcp-setup'>MCP setup</div>,
 }))
 vi.mock('@/app/workspace/[workspaceId]/search/components/search-source-setup', () => ({
   SearchSourceSetup: (props: { canAdmin: boolean }) => {
@@ -157,11 +159,29 @@ beforeEach(() => {
 
 afterEach(async () => {
   await act(async () => root.unmount())
+  vi.useRealTimers()
   container.remove()
   vi.unstubAllGlobals()
 })
 
 describe('unified Search sources', () => {
+  it('keeps typing responsive and debounces the server search', async () => {
+    vi.useFakeTimers()
+    await render()
+    const input = document.querySelector<HTMLInputElement>('input')!
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    await act(async () => {
+      setValue.call(input, 'git')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect(input.value).toBe('git')
+    expect(mocks.sourceQuery).toHaveBeenLastCalledWith('workspace-1', { search: '' })
+    await act(async () => vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS - 1))
+    expect(mocks.sourceQuery).toHaveBeenLastCalledWith('workspace-1', { search: '' })
+    await act(async () => vi.advanceTimersByTime(1))
+    expect(mocks.sourceQuery).toHaveBeenLastCalledWith('workspace-1', { search: 'git' })
+  })
+
   it('shows configured central Drive and GitLab sources to readers without setup controls', async () => {
     await render()
     expect(document.body.textContent).toContain('Google Drive')
@@ -171,7 +191,7 @@ describe('unified Search sources', () => {
     expect(button('Add source')).toBeUndefined()
     expect(button('Manage')).toBeUndefined()
     expect(button('Connect account')).toBeUndefined()
-    expect(mocks.sourceQuery).toHaveBeenCalledWith('workspace-1')
+    expect(mocks.sourceQuery).toHaveBeenCalledWith('workspace-1', { search: '' })
     expect(mocks.setup).toHaveBeenLastCalledWith(expect.objectContaining({ canAdmin: false }))
   })
 
@@ -351,7 +371,6 @@ describe('unified Search sources', () => {
     expect(document.body.textContent).toContain('No matching sources.')
     expect(document.body.textContent).not.toContain('Google Drive')
     expect(document.querySelector('[data-testid="source-setup"]')).not.toBeNull()
-    expect(document.querySelector('[data-testid="mcp-setup"]')).toBeNull()
     expect(mocks.urlUpdate).not.toHaveBeenCalled()
   })
 
@@ -376,12 +395,9 @@ describe('unified Search sources', () => {
     expect(document.body.textContent).not.toContain('Google Drive')
   })
 
-  it('keeps search above MCP setup and opens admin management by connector ID', async () => {
+  it('opens admin source management by connector ID', async () => {
     mocks.canAdmin = true
     await render()
-    const input = document.querySelector('input')!
-    const mcp = document.querySelector('[data-testid="mcp-setup"]')!
-    expect(input.compareDocumentPosition(mcp) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     await act(async () => button('Manage')!.click())
     await vi.waitFor(() =>
       expect(mocks.urlUpdate).toHaveBeenCalledWith(

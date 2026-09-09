@@ -1511,6 +1511,8 @@ export const rateLimitBucket = pgTable('rate_limit_bucket', {
   tokens: decimal('tokens').notNull(),
   lastRefillAt: timestamp('last_refill_at').notNull(),
   blockedUntil: timestamp('blocked_until'),
+  /** Bounded adaptive provider budgets and expiring request leases; ordinary buckets leave it null. */
+  capacityState: jsonb('capacity_state'),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })
 
@@ -2770,7 +2772,7 @@ export const knowledgeBase = pgTable(
     folderId: text('folder_id').references(() => folder.id, { onDelete: 'set null' }),
     name: text('name').notNull(),
     description: text('description'),
-    /** The workspace search index retains its identity when renamed or moved. */
+    /** Search indexes retain their identity independently of their display name. */
     isSearchIndex: boolean('is_search_index').notNull().default(false),
 
     // Token tracking for usage
@@ -2795,7 +2797,11 @@ export const knowledgeBase = pgTable(
   (table) => ({
     ownerCheck: check(
       'kb_owner_check',
-      sql`num_nonnulls(${table.workspaceId}, ${table.organizationId}) <= 1`
+      sql`num_nonnulls(${table.workspaceId}, ${table.organizationId}) = 1`
+    ),
+    organizationSearchIndexCheck: check(
+      'kb_organization_search_index_check',
+      sql`${table.organizationId} IS NULL OR ${table.isSearchIndex}`
     ),
     organizationIdIdx: index('kb_organization_id_idx').on(table.organizationId),
     organizationFolderCheck: check(
@@ -4227,6 +4233,7 @@ export const oauthRefreshToken = pgTable(
     revoked: timestamp('revoked'),
     authTime: timestamp('auth_time'),
     scopes: text('scopes').array().notNull(),
+    resource: text('resource'),
     familyId: text('family_id')
       .notNull()
       .references(() => oauthTokenFamily.id, { onDelete: 'cascade' }),
@@ -4245,6 +4252,11 @@ export const oauthRefreshToken = pgTable(
     generationCheck: check(
       'oauth_refresh_token_generation_check',
       sql`${table.generation} BETWEEN 0 AND 1000`
+    ),
+    /** contract-pending(after #7613 is fully deployed): validate oauth_refresh_token_search_resource_check separately so rollout avoids a token-table scan. */
+    searchResourceCheck: check(
+      'oauth_refresh_token_search_resource_check',
+      sql`NOT ('search:read' = ANY(${table.scopes})) OR ${table.resource} IS NOT NULL`
     ),
   })
 )
@@ -4267,6 +4279,7 @@ export const oauthAccessToken = pgTable(
     expiresAt: timestamp('expires_at').notNull(),
     createdAt: timestamp('created_at').notNull(),
     scopes: text('scopes').array().notNull(),
+    resource: text('resource'),
   },
   (table) => ({
     clientIdIdx: index('oauth_access_token_client_id_idx').on(table.clientId),
@@ -4275,6 +4288,11 @@ export const oauthAccessToken = pgTable(
     userClientIdx: index('oauth_access_token_user_client_idx').on(table.userId, table.clientId),
     /** Drives the cleanup pass; nothing else reads tokens by expiry. */
     expiresAtIdx: index('oauth_access_token_expires_at_idx').on(table.expiresAt),
+    /** contract-pending(after #7613 is fully deployed): validate oauth_access_token_search_resource_check separately so rollout avoids a token-table scan. */
+    searchResourceCheck: check(
+      'oauth_access_token_search_resource_check',
+      sql`NOT ('search:read' = ANY(${table.scopes})) OR ${table.resource} IS NOT NULL`
+    ),
   })
 )
 

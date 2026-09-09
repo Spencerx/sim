@@ -22,6 +22,7 @@ import {
   OAUTH_REFRESH_TOKEN_PREFIX,
   OAUTH_TOKEN_FAMILY_MAX_GENERATION,
 } from '@/lib/auth/oauth-provider'
+import { parseOAuthSearchResource } from '@/lib/auth/oauth-resource'
 import {
   acquireOrganizationUserMutationLocks,
   getUserOrganization,
@@ -48,6 +49,7 @@ export interface RotateOAuthRefreshTokenInput {
   credentials: OAuthClientCredentials
   refreshToken: string
   requestedScopes?: string[]
+  resource?: string
 }
 
 export type OAuthProtocolErrorCode =
@@ -55,6 +57,7 @@ export type OAuthProtocolErrorCode =
   | 'invalid_grant'
   | 'invalid_scope'
   | 'unauthorized_client'
+  | 'invalid_target'
 
 export type OAuthProtocolResult<T> =
   | { success: true; value: T }
@@ -89,6 +92,7 @@ interface RefreshTokenRow {
   revoked: Date | null
   authTime: Date | null
   scopes: string[]
+  resource: string | null
   familyId: string
   familyConsentId: string | null
   generation: number
@@ -216,6 +220,7 @@ async function readRefreshToken(
       revoked: oauthRefreshToken.revoked,
       authTime: oauthRefreshToken.authTime,
       scopes: oauthRefreshToken.scopes,
+      resource: oauthRefreshToken.resource,
       familyId: oauthRefreshToken.familyId,
       familyConsentId: oauthTokenFamily.consentId,
       generation: oauthRefreshToken.generation,
@@ -272,6 +277,14 @@ export async function rotateOAuthRefreshToken(
   if (!provisionalToken) return protocolError('invalid_grant', 'Refresh token is invalid.')
   if (provisionalToken.clientId !== input.credentials.clientId) {
     return protocolError('invalid_grant', 'Refresh token is invalid.')
+  }
+  if (input.resource !== undefined && input.resource !== provisionalToken.resource) {
+    return protocolError('invalid_target', 'The resource must match the original token grant.')
+  }
+  try {
+    parseOAuthSearchResource(provisionalToken.resource)
+  } catch {
+    return protocolError('invalid_target', 'The original resource is no longer supported.')
   }
 
   const membership = await getUserOrganization(provisionalToken.userId, database)
@@ -382,6 +395,7 @@ export async function rotateOAuthRefreshToken(
       currentToken.userId !== family.userId ||
       currentToken.sessionId !== family.sessionId ||
       currentToken.referenceId !== family.referenceId ||
+      currentToken.resource !== provisionalToken.resource ||
       currentToken.revoked ||
       currentToken.expiresAt <= rotationTime ||
       family.expiresAt <= rotationTime ||
@@ -448,6 +462,7 @@ export async function rotateOAuthRefreshToken(
       revoked: null,
       authTime: currentToken.authTime,
       scopes: currentToken.scopes,
+      resource: currentToken.resource,
       familyId: family.id,
       generation: nextGeneration,
     })
@@ -462,6 +477,7 @@ export async function rotateOAuthRefreshToken(
       expiresAt: accessExpiresAt,
       createdAt: rotationTime,
       scopes: scopes.value,
+      resource: currentToken.resource,
     })
 
     return {

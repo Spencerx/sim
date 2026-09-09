@@ -15,12 +15,19 @@ export type ScopedKnowledgeOperation<O extends WorkspaceOperation = WorkspaceOpe
   readonly organizationOperation: OrganizationOperation
 }
 
+interface KnowledgeOperationOptions {
+  organizationDelegation?: 'deny'
+}
+
 /** Binds organization policy to the same semantic operation declared for workspace access. */
 function defineKnowledgeOperation<const O extends WorkspaceOperation>(
-  operation: O
+  operation: O,
+  options?: KnowledgeOperationOptions
 ): ScopedKnowledgeOperation<O> {
   const supportsOrganizationDelegation =
-    operation.minimumRole === 'read' && operation.delegatedServices?.includes('copilot')
+    options?.organizationDelegation !== 'deny' &&
+    operation.minimumRole === 'read' &&
+    operation.delegatedServices?.includes('copilot')
   const organizationOperation = defineOrganizationOperation({
     id: operation.id,
     capability: operation.capability,
@@ -120,6 +127,21 @@ export const knowledgeOperations = {
       workspaceApiKey: 'allow',
       capability: 'knowledge.use',
       ...ALL_PRINCIPAL_POLICY,
+    })
+  ),
+  /**
+   * Streams a whole knowledge base out as one archive. A read-role principal
+   * may export because nothing leaves that the reader could not already page
+   * through, but the bulk shape is what `knowledge.export` lets a group withhold.
+   */
+  export: defineKnowledgeOperation(
+    defineWorkspaceOperation({
+      id: 'knowledge.export',
+      oauthScope: 'api:read',
+      minimumRole: 'read',
+      workspaceApiKey: 'allow',
+      capability: 'knowledge.export',
+      principalKinds: HTTP_PRINCIPAL_KINDS,
     })
   ),
   /**
@@ -243,7 +265,7 @@ export const knowledgeOperations = {
   search: defineKnowledgeOperation(
     defineWorkspaceOperation({
       id: 'knowledge.search',
-      oauthScope: 'api:read',
+      oauthScope: 'search:read',
       minimumRole: 'read',
       workspaceApiKey: 'allow',
       capability: 'knowledge.use',
@@ -257,8 +279,10 @@ export const knowledgeOperations = {
       minimumRole: 'read',
       workspaceApiKey: 'allow',
       capability: 'knowledge.use',
-      principalKinds: HTTP_PRINCIPAL_KINDS,
-    })
+      ...ALL_PRINCIPAL_POLICY,
+    }),
+    /** Folder mentions resolve workspace folders; organization delegation stays disabled. */
+    { organizationDelegation: 'deny' }
   ),
   createFolder: defineKnowledgeOperation(
     defineWorkspaceOperation({
@@ -303,7 +327,7 @@ export const knowledgeOperations = {
   readDocument: defineKnowledgeOperation(
     defineWorkspaceOperation({
       id: 'knowledge.documents.read',
-      oauthScope: 'api:read',
+      oauthScope: 'search:read',
       minimumRole: 'read',
       workspaceApiKey: 'allow',
       capability: 'knowledge.use',
@@ -379,7 +403,7 @@ export const knowledgeOperations = {
   listChunks: defineKnowledgeOperation(
     defineWorkspaceOperation({
       id: 'knowledge.chunks.list',
-      oauthScope: 'api:read',
+      oauthScope: 'search:read',
       minimumRole: 'read',
       workspaceApiKey: 'allow',
       capability: 'knowledge.use',
@@ -603,10 +627,37 @@ export const knowledgeOperations = {
       principalKinds: ['session'],
     })
   ),
+  readSearchSourceOverview: defineKnowledgeOperation(
+    defineWorkspaceOperation({
+      id: 'knowledge.search.sources.overview',
+      minimumRole: 'read',
+      workspaceApiKey: 'deny',
+      capability: 'knowledge.use',
+      principalKinds: ['session'],
+    })
+  ),
+  readSearchSourceProgress: defineKnowledgeOperation(
+    defineWorkspaceOperation({
+      id: 'knowledge.search.sources.progress',
+      minimumRole: 'read',
+      workspaceApiKey: 'deny',
+      capability: 'knowledge.use',
+      principalKinds: ['session'],
+    })
+  ),
   listSearchIntegrations: defineKnowledgeOperation(
     defineWorkspaceOperation({
       id: 'knowledge.search.integrations.list',
       minimumRole: 'read',
+      workspaceApiKey: 'deny',
+      capability: 'knowledge.use',
+      principalKinds: ['session'],
+    })
+  ),
+  readOrganizationSearchOverview: defineKnowledgeOperation(
+    defineWorkspaceOperation({
+      id: 'knowledge.search.integrations.overview',
+      minimumRole: 'admin',
       workspaceApiKey: 'deny',
       capability: 'knowledge.use',
       principalKinds: ['session'],
@@ -671,7 +722,7 @@ export const knowledgeOperations = {
   readSearchIndex: defineKnowledgeOperation(
     defineWorkspaceOperation({
       id: 'knowledge.search.index.read',
-      oauthScope: 'api:read',
+      oauthScope: 'search:read',
       minimumRole: 'read',
       workspaceApiKey: 'allow',
       capability: 'knowledge.use',
